@@ -268,3 +268,104 @@ hr { border: none; border-top: 2px dashed var(--paper-line); margin: 44px 0; }
   body.has-holes::before { display: none; }
   h1 { font-size: 30px; }
 }
+
+/* ---------- Profile / about page ---------- */
+.nav-strip {
+  display: flex; gap: 18px; align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  margin-bottom: 36px;
+}
+.nav-strip a { color: var(--ink-soft); text-decoration: none; }
+.nav-strip a:hover { text-decoration: underline; text-decoration-color: var(--margin-red); }
+.nav-strip .sep { color: var(--paper-line); }
+
+.profile-header { display: flex; gap: 24px; align-items: flex-start; margin-bottom: 8px; }
+.avatar {
+  flex: none;
+  width: 84px; height: 84px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: 'Kalam', cursive;
+  font-size: 30px;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 3px 4px 0 var(--shadow);
+  border: 3px solid #fffdf6;
+}
+.profile-name h1 { margin-bottom: 2px; }
+.profile-role {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+
+.tag-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }
+.chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  background: var(--tape);
+  color: var(--ink-soft);
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px solid #e4d8a8;
+}
+
+.profile-stats { display: flex; gap: 30px; margin: 22px 0 26px; flex-wrap: wrap; }
+.profile-stats .stat-item { text-align: left; }
+.profile-stats .stat-item .num { font-family: 'Kalam', cursive; font-size: 22px; font-weight: 700; color: var(--ink); }
+.profile-stats .stat-item .label { font-size: 11.5px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+
+.profile-links { display: flex; gap: 14px; margin: 10px 0 30px; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+.profile-links a {
+  color: var(--ink);
+  text-decoration: none;
+  border: 1px solid var(--paper-line);
+  padding: 5px 12px;
+  border-radius: 4px;
+  background: #fffdf6;
+}
+.profile-links a:hover { border-color: var(--ink-soft); }
+
+/* Learning / progress list */
+.learn-item {
+  display: flex; gap: 14px; align-items: flex-start;
+  background: #fffdf6;
+  border: 1px solid #e4dcc4;
+  border-radius: 3px;
+  padding: 14px 18px;
+  margin: 14px 0;
+  box-shadow: 2px 3px 0 var(--shadow);
+}
+.learn-item .badge {
+  flex: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  padding: 3px 9px;
+  border-radius: 10px;
+  margin-top: 3px;
+}
+.badge.done { background: #dcf0d3; color: #3a6b2a; }
+.badge.progress { background: #ffe9b3; color: #8a5a12; }
+.learn-item h4 { margin: 0 0 4px; font-family: 'Kalam', cursive; font-size: 17px; color: var(--ink); }
+.learn-item p { margin: 0; font-size: 14.5px; }
+.learn-item a { font-size: 13px; }
+
+/* Timeline for experience */
+.timeline { border-left: 2px dashed var(--paper-line); margin: 20px 0 20px 6px; padding-left: 22px; }
+.timeline-item { margin-bottom: 26px; position: relative; }
+.timeline-item::before {
+  content: "";
+  position: absolute;
+  left: -28px; top: 4px;
+  width: 10px; height: 10px;
+  background: var(--margin-red);
+  border-radius: 50%;
+  border: 2px solid var(--paper);
+}
+.timeline-item .role { font-family: 'Kalam', cursive; font-size: 18px; color: var(--ink); margin: 0; }
+.timeline-item .org-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted); margin: 2px 0 8px; }
+.timeline-item ul { margin: 6px 0; padding-left: 20px; }
+.timeline-item li { font-size: 14.5px; margin: 5px 0; }
