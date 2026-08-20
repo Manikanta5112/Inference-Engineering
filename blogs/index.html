@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inference Engineering — Mani's Notebook</title>
+<meta property="og:title" content="Inference Engineering — Mani's Notebook">
+<meta property="og:description" content="Notes on LLM inference, sampling, KV caches, and everything in between.">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="style-notebook.css">
+</head>
+<body class="has-holes">
+<div class="page">
+
+  <div class="index-header">
+    <h1>Inference Engineering</h1>
+    <div class="subtitle">A running notebook on how LLMs actually work under the hood.</div>
+    <div class="meta count">3 posts · updated August 2026</div>
+  </div>
+
+  <a class="post-card" href="kv-cache-good-and-evil.html">
+    <h3>The good and evil of KV cache</h3>
+    <p class="desc">How one optimization gave transformers linear-time decoding — and quietly became the biggest memory bottleneck in LLM serving. Benchmarked live on an H100.</p>
+    <div class="tags">
+      <span class="tag">KV cache</span>
+      <span class="tag">memory</span>
+      <span class="tag">vLLM</span>
+      <span class="tag level">intermediate</span>
+    </div>
+  </a>
+
+  <a class="post-card" href="llm-inference-sampling-kv-cache-roofline.html">
+    <h3>Sampling, KV cache, and the roofline model</h3>
+    <p class="desc">Top-k vs top-p sampling explained from first principles, then a walk through why decoding is memory-bound and how batching pushes you across the roofline's ridge point.</p>
+    <div class="tags">
+      <span class="tag">sampling</span>
+      <span class="tag">roofline</span>
+      <span class="tag level">beginner</span>
+    </div>
+  </a>
+
+  <a class="post-card" href="#">
+    <h3>Coming soon — MQA, GQA &amp; MLA</h3>
+    <p class="desc">The three answers to "how do we keep KV cache's speed without its memory bill" — from sharing heads to DeepSeek's latent compression trick.</p>
+    <div class="tags">
+      <span class="tag">attention</span>
+      <span class="tag level">advanced</span>
+    </div>
+  </a>
+
+  <div class="footer">© 2026 Mani · Inference Engineering</div>
+
+</div>
+</body>
+</html>
