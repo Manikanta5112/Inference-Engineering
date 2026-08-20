@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LLM Inference Notes — Sampling, KV Cache, Roofline</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+    line-height: 1.65;
+    color: #1a1a1a;
+    background: #fdfdfb;
+  }
+  h1 { font-size: 26px; font-weight: 600; margin-bottom: 4px; }
+  .subtitle { color: #6b6b66; font-size: 14px; margin-bottom: 36px; }
+  h2 {
+    font-size: 19px;
+    font-weight: 600;
+    margin-top: 44px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #e4e2da;
+  }
+  h3 { font-size: 15px; font-weight: 600; margin-top: 20px; }
+  p { margin: 10px 0; }
+  code {
+    background: #f1efe8;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: "SF Mono", Consolas, monospace;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 14px 0;
+    font-size: 14px;
+  }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #e4e2da; }
+  th { color: #6b6b66; font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
+  ul, ol { margin: 8px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  .box {
+    background: #f6f5ef;
+    border-left: 3px solid #b5904a;
+    border-radius: 0 8px 8px 0;
+    padding: 12px 16px;
+    margin: 16px 0;
+    font-size: 14.5px;
+  }
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    font-size: 13.5px;
+    background: #f6f5ef;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 14px 0;
+  }
+  .flow span.step {
+    background: #fff;
+    border: 1px solid #ddd9cc;
+    border-radius: 6px;
+    padding: 4px 10px;
+  }
+  .flow span.arrow { color: #999; }
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 6px;
+  }
+  .tag.mem { background: #fbe4de; color: #8a3a24; }
+  .tag.compute { background: #e3ecd6; color: #3f5c1d; }
+  .footer { margin-top: 60px; font-size: 12px; color: #999; text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>LLM inference notes</h1>
+<div class="subtitle">Sampling → KV cache → the roofline model, in order</div>
+
+<h2>1. Decoding pipeline (logits → next token)</h2>
+<div class="flow">
+  <span class="step">Logits</span><span class="arrow">→</span>
+  <span class="step">Temperature scaling</span><span class="arrow">→</span>
+  <span class="step">Softmax</span><span class="arrow">→</span>
+  <span class="step">Top-k / Top-p filter</span><span class="arrow">→</span>
+  <span class="step">Renormalize</span><span class="arrow">→</span>
+  <span class="step">Multinomial sample</span>
+</div>
+
+<h3>Temperature</h3>
+<p>Divides logits before softmax. Low T → sharper, more confident distribution. High T → flatter, more random/creative (sometimes nonsensical).</p>
+
+<h3>Top-k</h3>
+<p>Always keeps a <b>fixed count</b> of tokens (e.g. k=50), regardless of how peaked or flat the distribution is.</p>
+
+<h3>Top-p (nucleus sampling)</h3>
+<p>Sort probabilities descending, walk down accumulating them, stop as soon as the <b>cumulative sum ≥ p</b>. Keep that set — the count is dynamic, adapting to the shape of the distribution.</p>
+
+<div class="box">
+<b>Example (p = 0.9):</b><br>
+the: 0.48 (cum 0.48) · a: 0.29 (cum 0.77) · cat: 0.11 (cum 0.88) · dog: 0.09 (cum <b>0.97</b> ← crosses 0.9, stop)<br>
+Keep {the, a, cat, dog}. Renormalize by dividing each by the <b>total kept mass (0.97)</b> — not by the crossing token's own probability — so they sum back to 1. Then sample.
+</div>
+
+<h2>2. KV cache</h2>
+<p>Self-attention needs a Key and Value vector for every token seen so far. Without a cache, you <b>recompute K,V for the entire sequence from scratch at every generation step</b> — pure waste, since nothing about past tokens changed.</p>
+
+<table>
+<tr><th>Step</th><th>Without cache</th><th>With cache</th></tr>
+<tr><td>Predict token 5</td><td>compute K,V for 4 tokens</td><td>compute K,V for 4 tokens</td></tr>
+<tr><td>Predict token 6</td><td>compute K,V for 5 tokens</td><td>compute K,V for 1 new token</td></tr>
+<tr><td>Predict token 7</td><td>compute K,V for 6 tokens</td><td>compute K,V for 1 new token</td></tr>
+<tr><td>Growth</td><td>O(n²) — quadratic</td><td>O(n) — linear</td></tr>
+</table>
+
+<p><b>Cache is per-layer.</b> Each transformer block has its own <code>W_k</code>, <code>W_v</code>, so each block's K,V are numerically different and must be cached separately. 8 layers → 8 independent KV caches. Total cache size ≈ <code>layers × 2 (K,V) × tokens × dim</code>.</p>
+
+<h2>3. The roofline model</h2>
+<p>A way to see whether an operation is bottlenecked by <b>compute</b> or by <b>memory bandwidth</b>, based on <b>arithmetic intensity</b> = compute ÷ bytes moved.</p>
+
+<table>
+<tr><th></th><th>Memory-bound <span class="tag mem">idle compute</span></th><th>Compute-bound <span class="tag compute">busy compute</span></th></tr>
+<tr><td>Bytes moved</td><td>a lot</td><td>relatively few</td></tr>
+<tr><td>Compute per byte</td><td>tiny</td><td>large</td></tr>
+<tr><td>Position on roofline</td><td>below the diagonal (left)</td><td>on the plateau (right, past the ridge)</td></tr>
+</table>
+
+<h3>Prefill vs decode</h3>
+<ul>
+<li><b>Prefill</b> (processing the prompt): matrix-<i>matrix</i> multiply — one weight load reused across many tokens at once. High intensity → <b>compute-bound</b>.</li>
+<li><b>Decode</b> (one new token at a time, with KV cache): matrix-<i>vector</i> multiply — huge weights loaded, tiny compute for one token. Low intensity → <b>memory-bound</b>.</li>
+</ul>
+
+<div class="box">
+<b>KV cache's effect on the roofline position:</b><br>
+Without cache, you redo real (wasted) matrix work every step — looks more compute-heavy, sits higher.<br>
+With cache, that recompute vanishes — what's left is almost pure memory movement vs. tiny compute. The point drops <b>low and left</b>, deep into memory-bound. The cache doesn't just save time — it exposes the true bottleneck.
+</div>
+
+<h2>4. The goal — and why so many techniques exist</h2>
+<p>The whole aim across LLM inference optimization: <b>push arithmetic intensity up, cross the ridge point, keep the GPU's compute units busy instead of idle waiting on memory.</b></p>
+
+<table>
+<tr><th>Technique</th><th>How it raises arithmetic intensity</th></tr>
+<tr><td>Continuous / dynamic batching</td><td>one weight load now serves many requests' tokens, not one</td></tr>
+<tr><td>Multi-query / grouped-query attention</td><td>shrinks KV cache size per token → less data to move</td></tr>
+<tr><td>Speculative decoding</td><td>verifies several draft tokens in one batched pass</td></tr>
+<tr><td>Quantization (int8 / int4)</td><td>fewer bytes per weight for the same compute</td></tr>
+<tr><td>FlashAttention</td><td>avoids writing/reading large intermediates to slow memory</td></tr>
+</table>
+
+<div class="footer">Notes compiled from conversation · sampling → KV cache → roofline model</div>
+
+</body>
+</html>
