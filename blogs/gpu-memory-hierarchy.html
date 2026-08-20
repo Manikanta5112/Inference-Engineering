@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How a GPU Actually Moves Data</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0a0d12;
+    --bg-raised: #12161f;
+    --bg-card: #161b26;
+    --line: #262e3d;
+    --line-soft: #1c2230;
+    --text: #e7eaf1;
+    --text-dim: #8b93a7;
+    --text-faint: #5a6376;
+    --copper: #e8a355;
+    --copper-dim: #7a5a34;
+    --teal: #4fd1c5;
+    --teal-dim: #2a5a56;
+    --violet: #a78bfa;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-body: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection{ background: var(--copper-dim); color: #fff; }
+  .wrap{ max-width: 920px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---- background texture ---- */
+  .grid-bg{
+    position: fixed; inset: 0; z-index: -1;
+    background-image:
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size: 42px 42px;
+    opacity: 0.35;
+    mask-image: radial-gradient(ellipse 80% 50% at 50% 0%, black 40%, transparent 90%);
+  }
+
+  /* ---- hero ---- */
+  header.hero{ padding: 96px 0 56px; }
+  .eyebrow{
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--teal);
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 22px;
+  }
+  .eyebrow::before{
+    content: ''; width: 7px; height: 7px; background: var(--teal); border-radius: 50%;
+    box-shadow: 0 0 12px var(--teal);
+  }
+  h1{
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(34px, 5.5vw, 54px);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    max-width: 15ch;
+  }
+  h1 em{ font-style: normal; color: var(--copper); }
+  .lede{
+    margin-top: 22px;
+    font-size: 18px;
+    color: var(--text-dim);
+    max-width: 56ch;
+  }
+  .lede b{ color: var(--text); font-weight: 600; }
+
+  section{ padding: 64px 0; border-top: 1px solid var(--line-soft); }
+  .kicker{
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-faint);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  h2{
+    font-family: var(--font-display);
+    font-size: clamp(24px, 3.4vw, 32px);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin-bottom: 14px;
+  }
+  p.body-text{ color: var(--text-dim); max-width: 62ch; font-size: 16px; }
+  p.body-text + p.body-text{ margin-top: 12px; }
+
+  /* ---- kitchen analogy cards ---- */
+  .analogy-grid{
+    margin-top: 36px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .analogy-card{
+    background: var(--bg-card);
+    padding: 22px 18px;
+    position: relative;
+  }
+  .analogy-card .tag{
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .analogy-card h3{
+    font-family: var(--font-display);
+    font-size: 17px;
+    margin: 8px 0 6px;
+  }
+  .analogy-card .size{
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .analogy-card p{ font-size: 13.5px; color: var(--text-dim); }
+  .c-reg .size{ color: var(--copper); }
+  .c-l1 .size{ color: var(--copper); }
+  .c-l2 .size{ color: var(--violet); }
+  .c-hbm .size{ color: var(--teal); }
+
+  @media (max-width: 700px){
+    .analogy-grid{ grid-template-columns: 1fr 1fr; }
+  }
+
+  /* ---- hierarchy diagram ---- */
+  .diagram{
+    margin-top: 40px;
+    background: var(--bg-raised);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 28px;
+  }
+  .tier{
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin: 0 auto 14px;
+    background: var(--bg-card);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    transition: transform 0.25s ease, border-color 0.25s ease;
+  }
+  .tier .tname{ font-family: var(--font-display); font-weight: 600; font-size: 15px; }
+  .tier .tsub{ font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); margin-top: 3px;}
+  .tier .tsize{ font-family: var(--font-mono); font-size: 15px; font-weight: 600; white-space: nowrap; }
+  .t-hbm{ width: 100%; } .t-hbm .tsize{ color: var(--teal); }
+  .t-l2{ width: 78%; } .t-l2 .tsize{ color: var(--violet); }
+  .t-l1{ width: 50%; } .t-l1 .tsize{ color: var(--copper); }
+  .t-reg{ width: 26%; margin-bottom: 0; } .t-reg .tsize{ color: var(--copper); }
+  .arrow-col{ display:flex; flex-direction:column; align-items:center; gap: 2px; margin: 2px 0; color: var(--text-faint); font-family: var(--font-mono); font-size: 10px; }
+
+  /* ---- tile demo ---- */
+  .demo{
+    margin-top: 40px;
+    background: var(--bg-raised);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 28px;
+  }
+  .demo-head{
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 14px; margin-bottom: 26px;
+  }
+  .demo-status{
+    font-family: var(--font-mono); font-size: 13px; color: var(--teal);
+    min-height: 18px;
+  }
+  button.run-btn{
+    font-family: var(--font-mono);
+    background: var(--copper);
+    color: #1a1206;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  button.run-btn:hover{ background: #f0b46e; transform: translateY(-1px); }
+  button.run-btn:active{ transform: translateY(0); }
+  button.run-btn:disabled{ opacity: 0.45; cursor: default; transform: none; }
+
+  .lanes{
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    gap: 10px 16px;
+    align-items: center;
+  }
+  .lane-label{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    text-align: right;
+  }
+  .lane-track{
+    position: relative;
+    height: 46px;
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  .lane-track.active{ border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal) inset; }
+  .chip{
+    position: absolute;
+    top: 6px;
+    width: 34px; height: 32px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    color: #0a0d12;
+    transition: left 0.6s cubic-bezier(.4,0,.2,1);
+    left: 6px;
+  }
+  .chip-w{ background: var(--teal); }
+  .chip-x{ background: var(--violet); color: #fff; }
+  .pulse{
+    animation: pulse-glow 0.5s ease-in-out infinite alternate;
+  }
+  @keyframes pulse-glow{
+    from{ box-shadow: 0 0 4px 0 rgba(232,163,85,0.4); }
+    to{ box-shadow: 0 0 14px 4px rgba(232,163,85,0.7); }
+  }
+  .counters{
+    margin-top: 22px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .counter{ background: var(--bg-card); padding: 14px 16px; }
+  .counter .clabel{ font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); text-transform: uppercase; }
+  .counter .cval{ font-family: var(--font-display); font-size: 22px; font-weight: 600; margin-top: 4px; }
+  .demo-note{ margin-top: 18px; font-size: 13.5px; color: var(--text-dim); }
+  .demo-note b{ color: var(--copper); font-weight: 600; }
+
+  /* ---- bandwidth section ---- */
+  .bw-compare{
+    margin-top: 32px;
+    display: grid;
+    gap: 18px;
+  }
+  .bw-row{ display: grid; grid-template-columns: 140px 1fr 90px; align-items: center; gap: 14px; }
+  .bw-row .blabel{ font-family: var(--font-mono); font-size: 12.5px; color: var(--text-dim); }
+  .bw-bar-bg{ height: 26px; background: var(--bg-card); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .bw-bar{ height: 100%; border-radius: 5px 0 0 5px; }
+  .bw-bar.weights{ background: linear-gradient(90deg, var(--teal-dim), var(--teal)); width: 0%; }
+  .bw-bar.compute{ background: linear-gradient(90deg, var(--copper-dim), var(--copper)); width: 0%; }
+  .bw-row .bval{ font-family: var(--font-mono); font-size: 12.5px; text-align: right; color: var(--text-faint); }
+
+  footer{ padding: 48px 0 80px; color: var(--text-faint); font-size: 13px; font-family: var(--font-mono); }
+
+  @media (max-width: 640px){
+    .lanes{ grid-template-columns: 74px 1fr; }
+    .demo, .diagram{ padding: 18px; }
+  }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">GPU memory, from the ground up</div>
+    <h1>Your GPU has a <em>tiny desk</em> and a <em>giant warehouse</em> — here's how a 70B model gets computed anyway.</h1>
+    <p class="lede">Math can only happen in <b>registers</b> — a space smaller than a phone's contact list. Everything else, including a 140GB pile of model weights, has to be shipped there in tiny pieces, used, and thrown away to make room for the next piece. This is the entire story.</p>
+  </header>
+
+  <section id="analogy">
+    <div class="kicker">01 — The four rooms</div>
+    <h2>Think of it as a kitchen, not a warehouse</h2>
+    <p class="body-text">Every GPU chip is really four "rooms" nested inside each other, each one faster and dramatically smaller than the last. Cooking (arithmetic) only happens on the countertop — never in the warehouse.</p>
+
+    <div class="analogy-grid">
+      <div class="analogy-card c-reg">
+        <div class="tag">Fastest</div>
+        <h3>Registers</h3>
+        <div class="size">~256 KB / SM</div>
+        <p>The countertop. Math (multiply-add) only happens here. Holds a handful of numbers at a time.</p>
+      </div>
+      <div class="analogy-card c-l1">
+        <div class="tag">Per-core</div>
+        <h3>L1 / Shared mem</h3>
+        <div class="size">~192 KB / SM</div>
+        <p>The cutting board next to the stove. Staging area where a tile is prepped before it hits registers.</p>
+      </div>
+      <div class="analogy-card c-l2">
+        <div class="tag">Shared chip-wide</div>
+        <h3>L2 cache</h3>
+        <div class="size">~50 MB total</div>
+        <p>The kitchen pantry. Shared by every "cook" (SM) on the chip. Faster than the warehouse, still small.</p>
+      </div>
+      <div class="analogy-card c-hbm">
+        <div class="tag">Slowest, biggest</div>
+        <h3>HBM / VRAM</h3>
+        <div class="size">~80 GB total</div>
+        <p>The warehouse down the street. Holds everything — all 70B weights — but every trip there is slow.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="hierarchy">
+    <div class="kicker">02 — To scale (sort of)</div>
+    <h2>The size gap is enormous</h2>
+    <p class="body-text">Bar width below is roughly proportional to capacity. Registers and L1 are so small next to VRAM that at true scale they'd be invisible pixels — that's the entire problem this article is about.</p>
+
+    <div class="diagram">
+      <div class="tier t-hbm">
+        <div><div class="tname">HBM (VRAM)</div><div class="tsub">holds the full 70B weight set</div></div>
+        <div class="tsize">~80 GB</div>
+      </div>
+      <div class="arrow-col">↓ slow, ~2 TB/s</div>
+      <div class="tier t-l2">
+        <div><div class="tname">L2 Cache</div><div class="tsub">shared across all SMs</div></div>
+        <div class="tsize">~50 MB</div>
+      </div>
+      <div class="arrow-col">↓ faster</div>
+      <div class="tier t-l1">
+        <div><div class="tname">L1 / Shared Memory</div><div class="tsub">private to one SM</div></div>
+        <div class="tsize">~192 KB</div>
+      </div>
+      <div class="arrow-col">↓ fastest</div>
+      <div class="tier t-reg">
+        <div><div class="tname">Registers</div><div class="tsub">where math happens</div></div>
+        <div class="tsize">~256 KB</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="demo">
+    <div class="kicker">03 — Watch it move</div>
+    <h2>Both weights and inputs travel — in small tiles</h2>
+    <p class="body-text">Neither the whole 70B weight matrix nor the whole input ever sits in fast memory. A small <b>tile</b> of each is fetched, multiplied together, reused a few times, then thrown away for the next tile. Press run to watch one tile make the trip.</p>
+
+    <div class="demo">
+      <div class="demo-head">
+        <button class="run-btn" id="runBtn">▶ Run one tile</button>
+        <div class="demo-status" id="status">Idle — press run</div>
+      </div>
+
+      <div class="lanes">
+        <div class="lane-label">HBM</div>
+        <div class="lane-track" id="lane-hbm">
+          <div class="chip chip-w" id="chipW" style="left:6px;">W</div>
+          <div class="chip chip-x" id="chipX" style="left:46px;">X</div>
+        </div>
+
+        <div class="lane-label">L2</div>
+        <div class="lane-track" id="lane-l2"></div>
+
+        <div class="lane-label">L1</div>
+        <div class="lane-track" id="lane-l1"></div>
+
+        <div class="lane-label">Registers</div>
+        <div class="lane-track" id="lane-reg"></div>
+      </div>
+
+      <div class="counters">
+        <div class="counter"><div class="clabel">Tiles moved</div><div class="cval" id="cTiles">0</div></div>
+        <div class="counter"><div class="clabel">Reuses in registers</div><div class="cval" id="cReuse">0</div></div>
+        <div class="counter"><div class="clabel">Trips to warehouse</div><div class="cval" id="cTrips">0</div></div>
+      </div>
+      <p class="demo-note"><b>W</b> = a small piece of the weight matrix. <b>X</b> = a small piece of the input/activation. They meet in registers, get multiplied-and-added several times over (that's the "reuse" counter), and only then does the result get written back out.</p>
+    </div>
+  </section>
+
+  <section id="bandwidth">
+    <div class="kicker">04 — Why this matters for a 70B model</div>
+    <h2>The GPU spends most of its time waiting, not computing</h2>
+    <p class="body-text">Generating one token means every one of the 70B weights has to make the HBM → register trip once. That's ~140GB of traffic (fp16) for a tiny amount of actual math per weight. The compute units finish almost instantly and then sit idle waiting for the next byte to arrive — this is why LLM inference is called <b style="color:var(--text)">memory-bandwidth bound</b>, and why shrinking the weights (quantization) speeds things up more than making the chip do more FLOPs.</p>
+
+    <div class="bw-compare">
+      <div class="bw-row">
+        <div class="blabel">Moving weights</div>
+        <div class="bw-bar-bg"><div class="bw-bar weights" id="barWeights"></div></div>
+        <div class="bval" id="valWeights">— ms</div>
+      </div>
+      <div class="bw-row">
+        <div class="blabel">Doing the math</div>
+        <div class="bw-bar-bg"><div class="bw-bar compute" id="barCompute"></div></div>
+        <div class="bval" id="valCompute">— ms</div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    per-SM figures ~ NVIDIA H100 SXM · illustrative, not exact silicon specs
+  </footer>
+</div>
+
+<script>
+  // ---- tile flow demo ----
+  const btn = document.getElementById('runBtn');
+  const status = document.getElementById('status');
+  const chipW = document.getElementById('chipW');
+  const chipX = document.getElementById('chipX');
+  const lanes = { hbm: document.getElementById('lane-hbm'), l2: document.getElementById('lane-l2'), l1: document.getElementById('lane-l1'), reg: document.getElementById('lane-reg') };
+  const cTiles = document.getElementById('cTiles');
+  const cReuse = document.getElementById('cReuse');
+  const cTrips = document.getElementById('cTrips');
+
+  let tiles = 0, trips = 0;
+
+  function clearActive(){ Object.values(lanes).forEach(l => l.classList.remove('active')); }
+  function placeIn(lane, xW, xX){
+    lane.appendChild(chipW); lane.appendChild(chipX);
+    requestAnimationFrame(()=>{ chipW.style.left = xW+'px'; chipX.style.left = xX+'px'; });
+  }
+  function wait(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+  async function runTile(){
+    btn.disabled = true;
+    tiles++; trips++;
+    cTiles.textContent = tiles; cTrips.textContent = trips;
+    let reuse = 0;
+    chipW.classList.remove('pulse'); chipX.classList.remove('pulse');
+
+    clearActive(); lanes.hbm.classList.add('active');
+    status.textContent = 'Fetching tile from HBM (the warehouse)…';
+    placeIn(lanes.hbm, 6, 46);
+    await wait(700);
+
+    clearActive(); lanes.l2.classList.add('active');
+    status.textContent = 'Landed in L2 — shared pantry for the whole chip…';
+    placeIn(lanes.l2, 6, 46);
+    await wait(650);
+
+    clearActive(); lanes.l1.classList.add('active');
+    status.textContent = 'Staged in L1 / shared memory — prepping on the cutting board…';
+    placeIn(lanes.l1, 6, 46);
+    await wait(650);
+
+    clearActive(); lanes.reg.classList.add('active');
+    status.textContent = 'In registers — math can finally happen.';
+    placeIn(lanes.reg, 6, 46);
+    await wait(500);
+
+    chipW.classList.add('pulse'); chipX.classList.add('pulse');
+    for(let i=0;i<4;i++){
+      reuse++; cReuse.textContent = reuse;
+      status.textContent = `Multiply-accumulate #${reuse} — reusing the same tile before it's evicted…`;
+      await wait(420);
+    }
+    chipW.classList.remove('pulse'); chipX.classList.remove('pulse');
+
+    status.textContent = 'Tile evicted, result written back. Next tile would repeat this trip.';
+    await wait(600);
+    clearActive();
+    btn.disabled = false;
+  }
+
+  btn.addEventListener('click', runTile);
+
+  // ---- bandwidth bars ----
+  function animateBar(el, valEl, targetPct, targetLabel, delay){
+    setTimeout(()=>{
+      el.style.transition = 'width 1.1s cubic-bezier(.4,0,.2,1)';
+      el.style.width = targetPct + '%';
+      valEl.textContent = targetLabel;
+    }, delay);
+  }
+  const bwSection = document.getElementById('bandwidth');
+  let bwPlayed = false;
+  const obs = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting && !bwPlayed){
+        bwPlayed = true;
+        animateBar(document.getElementById('barWeights'), document.getElementById('valWeights'), 92, '~70 ms', 150);
+        animateBar(document.getElementById('barCompute'), document.getElementById('valCompute'), 8, '~6 ms', 150);
+      }
+    });
+  }, { threshold: 0.4 });
+  obs.observe(bwSection);
+</script>
+</body>
+</html>

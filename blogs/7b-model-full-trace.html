@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>7B Model: Prompt to Reply, Fully Traced</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0d0f14; --bg-panel:#14161d; --bg-card:#191c25; --line:#2a2e3a; --line-soft:#1e212b;
+    --text:#e6e8ee; --text-dim:#8b90a0; --text-faint:#565b6b;
+    --accent:#e8a355; --teal:#4fd1c5; --violet:#a78bfa; --teal-dim:#2a5a56; --accent-dim:#5a3f2a;
+    --font-d:'Space Grotesk',sans-serif; --font-m:'JetBrains Mono',monospace; --font-b:'Inter',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--font-b);line-height:1.6;}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 24px;}
+  header.hero{padding:72px 0 40px;}
+  .eyebrow{font-family:var(--font-m);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--teal);display:flex;align-items:center;gap:10px;margin-bottom:18px;}
+  .eyebrow::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--teal);box-shadow:0 0 10px var(--teal);}
+  h1{font-family:var(--font-d);font-weight:700;font-size:clamp(28px,4.4vw,42px);line-height:1.14;max-width:20ch;}
+  h1 em{font-style:normal;color:var(--accent);}
+  .lede{margin-top:16px;font-size:16.5px;color:var(--text-dim);max-width:66ch;}
+  .lede b{color:var(--text);}
+  .specs{margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;}
+  .spec-chip{font-family:var(--font-m);font-size:11.5px;background:var(--bg-card);border:1px solid var(--line);border-radius:6px;padding:6px 11px;color:var(--text-dim);}
+
+  main{padding:20px 0 70px;}
+
+  .stage{
+    display:grid; grid-template-columns: 1.4fr 1fr; gap:20px;
+    background:var(--bg-panel); border:1px solid var(--line); border-radius:16px; padding:26px;
+  }
+  @media (max-width:820px){ .stage{grid-template-columns:1fr;} }
+
+  .stage-left{ display:flex; flex-direction:column; }
+  .phase-badge{
+    display:inline-flex; align-self:flex-start; align-items:center; gap:8px;
+    font-family:var(--font-m); font-size:11px; text-transform:uppercase; letter-spacing:.08em;
+    padding:6px 12px; border-radius:20px; margin-bottom:16px; border:1px solid var(--line);
+  }
+  .phase-badge.prefill{ color:var(--teal); border-color:var(--teal-dim); background:rgba(79,209,197,0.08);}
+  .phase-badge.decode{ color:var(--accent); border-color:var(--accent-dim); background:rgba(232,163,85,0.08);}
+  .phase-badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+  .step-title{font-family:var(--font-d); font-size:20px; font-weight:600; margin-bottom:8px;}
+  .step-text{font-size:14.5px; color:var(--text-dim); min-height:66px;}
+  .step-text b{color:var(--text);}
+  .step-text .teal-b{color:var(--teal); font-weight:600;}
+  .step-text .accent-b{color:var(--accent); font-weight:600;}
+
+  .token-strip{display:flex; flex-wrap:wrap; gap:6px; margin:16px 0;}
+  .tok{font-family:var(--font-m); font-size:12px; background:var(--bg-card); border:1px solid var(--line); border-radius:6px; padding:6px 10px; transition:all .3s ease; color:var(--text-dim);}
+  .tok.prompt-active{border-color:var(--teal); color:var(--teal); box-shadow:0 0 0 1px var(--teal) inset;}
+  .tok.gen{border-color:var(--accent-dim); color:var(--accent);}
+  .tok.gen-active{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; background:rgba(232,163,85,0.1);}
+
+  .layer-track{margin-top:auto; padding-top:16px;}
+  .layer-label{font-family:var(--font-m); font-size:11px; color:var(--text-faint); display:flex; justify-content:space-between; margin-bottom:6px;}
+  .layer-bar-bg{height:8px; background:var(--bg-card); border-radius:4px; overflow:hidden; border:1px solid var(--line);}
+  .layer-bar{height:100%; width:0%; border-radius:4px; transition:width .12s linear;}
+  .layer-bar.prefill-fill{background:linear-gradient(90deg,var(--teal-dim),var(--teal));}
+  .layer-bar.decode-fill{background:linear-gradient(90deg,var(--accent-dim),var(--accent));}
+
+  .controls{display:flex; gap:10px; margin-top:20px;}
+  button.step-btn{font-family:var(--font-m); background:var(--accent); color:#1a1206; border:none; padding:10px 20px; border-radius:8px; font-size:12.5px; font-weight:700; cursor:pointer;}
+  button.step-btn:hover{background:#f0b46e;}
+  button.step-btn:disabled{opacity:.4; cursor:default;}
+  button.step-btn.secondary{background:transparent; border:1px solid var(--line); color:var(--text-dim);}
+
+  /* right side: hierarchy + hbm contents + stats */
+  .stage-right{display:flex; flex-direction:column; gap:16px;}
+  .hierarchy{background:var(--bg-card); border:1px solid var(--line); border-radius:12px; padding:16px;}
+  .h-title{font-family:var(--font-m); font-size:10.5px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px;}
+  .h-tier{
+    border:1px solid var(--line); border-radius:7px; padding:8px 12px; margin-bottom:6px;
+    font-family:var(--font-m); font-size:11px; background:var(--bg-panel); color:var(--text-dim);
+    transition:border-color .25s, box-shadow .25s, color .25s;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .h-tier.hot{ border-color:var(--accent); color:var(--accent); box-shadow:0 0 10px -3px var(--accent); }
+  .h-tier.hot.hot-teal{ border-color:var(--teal); color:var(--teal); box-shadow:0 0 10px -3px var(--teal); }
+  .h-tier .hsz{color:var(--text-faint); font-size:9.5px;}
+  .h-tier.hot .hsz{color:inherit; opacity:.75;}
+
+  .hbm-contents{background:var(--bg-card); border:1px solid var(--line); border-radius:12px; padding:16px;}
+  .hc-row{margin-bottom:12px;}
+  .hc-row:last-child{margin-bottom:0;}
+  .hc-label{font-family:var(--font-m); font-size:10.5px; color:var(--text-faint); text-transform:uppercase; display:flex; justify-content:space-between; margin-bottom:5px;}
+  .hc-bar-bg{height:14px; background:var(--bg-panel); border:1px solid var(--line); border-radius:4px; overflow:hidden;}
+  .hc-bar{height:100%; border-radius:3px; transition:width .4s ease;}
+  .hc-bar.weights{background:linear-gradient(90deg,#3d4a52,#5c8a91); width:100%;}
+  .hc-bar.kv{background:linear-gradient(90deg,var(--accent-dim),var(--accent)); width:2%;}
+
+  .stats{background:var(--bg-card); border:1px solid var(--line); border-radius:12px; padding:16px; display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .stat{}
+  .stat .sl{font-family:var(--font-m); font-size:9.5px; color:var(--text-faint); text-transform:uppercase;}
+  .stat .sv{font-family:var(--font-d); font-size:19px; font-weight:600; margin-top:2px;}
+
+  .progress-dots{display:flex; gap:5px; margin-top:18px;}
+  .pdot{flex:1; height:4px; background:var(--line); border-radius:2px; transition:background .3s;}
+  .pdot.done{background:var(--accent);}
+
+  /* summary */
+  .summary{margin-top:24px; display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  .sum-card{background:var(--bg-card); border:1px solid var(--line); border-radius:12px; padding:18px;}
+  .sum-card h4{font-family:var(--font-d); font-size:15px; margin-bottom:10px;}
+  .sum-card.prefill h4{color:var(--teal);}
+  .sum-card.decode h4{color:var(--accent);}
+  .sum-bar-bg{height:22px; background:var(--bg-panel); border:1px solid var(--line); border-radius:5px; overflow:hidden; margin-top:8px;}
+  .sum-bar{height:100%; transition:width 1s ease;}
+  .sum-bar.pf{background:linear-gradient(90deg,var(--teal-dim),var(--teal)); width:0%;}
+  .sum-bar.dc{background:linear-gradient(90deg,var(--accent-dim),var(--accent)); width:0%;}
+  .sum-card .sv{font-family:var(--font-m); font-size:12px; color:var(--text-dim); margin-top:6px;}
+  @media (max-width:640px){ .summary{grid-template-columns:1fr;} }
+
+  footer{padding:0 0 76px; color:var(--text-faint); font-size:12px; font-family:var(--font-m); text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">Fully traced, one real prompt</div>
+    <h1>A 7B model answers <em>"The capital of France is"</em> — every hop, HBM to CUDA core.</h1>
+    <p class="lede">Same prompt, start to finish: tokenize → embed → 32 transformer layers → sample a token, then loop. Watch what moves, what gets reused, and why the two phases feel so different to the hardware.</p>
+    <div class="specs">
+      <span class="spec-chip">d_model = 4096</span>
+      <span class="spec-chip">layers = 32</span>
+      <span class="spec-chip">weights ≈ 14 GB (fp16)</span>
+      <span class="spec-chip">prompt = 5 tokens</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="stage">
+      <div class="stage-left">
+        <div class="phase-badge prefill" id="phaseBadge"><span class="dot"></span><span id="phaseText">Idle</span></div>
+        <div class="step-title" id="stepTitle">Ready</div>
+        <div class="step-text" id="stepText">Press "Start" to begin tracing the prompt through the model.</div>
+
+        <div class="token-strip" id="tokenStrip"></div>
+
+        <div class="layer-track">
+          <div class="layer-label"><span id="layerLabelText">Layer</span><span id="layerCount">0 / 32</span></div>
+          <div class="layer-bar-bg"><div class="layer-bar prefill-fill" id="layerBar"></div></div>
+        </div>
+
+        <div class="progress-dots" id="progressDots"></div>
+
+        <div class="controls">
+          <button class="step-btn" id="nextBtn">▶ Start</button>
+          <button class="step-btn secondary" id="resetBtn">Reset</button>
+        </div>
+      </div>
+
+      <div class="stage-right">
+        <div class="hierarchy">
+          <div class="h-title">Memory hierarchy — active hop glows</div>
+          <div class="h-tier" id="tier-hbm">HBM (VRAM) <span class="hsz">~80GB</span></div>
+          <div class="h-tier" id="tier-l2">L2 Cache <span class="hsz">~50MB</span></div>
+          <div class="h-tier" id="tier-l1">L1 / Shared Mem <span class="hsz">~192KB</span></div>
+          <div class="h-tier" id="tier-reg">Registers <span class="hsz">~256KB</span></div>
+          <div class="h-tier" id="tier-core">CUDA / Tensor Cores <span class="hsz">math happens here</span></div>
+        </div>
+
+        <div class="hbm-contents">
+          <div class="h-title">What's sitting in HBM</div>
+          <div class="hc-row">
+            <div class="hc-label"><span>Model weights (static, ~14GB)</span><span>fp16</span></div>
+            <div class="hc-bar-bg"><div class="hc-bar weights"></div></div>
+          </div>
+          <div class="hc-row">
+            <div class="hc-label"><span>KV cache</span><span id="kvCount">0 tokens</span></div>
+            <div class="hc-bar-bg"><div class="hc-bar kv" id="kvBar"></div></div>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><div class="sl">HBM weight fetches</div><div class="sv" id="statFetches">0</div></div>
+          <div class="stat"><div class="sl">Tokens produced</div><div class="sv" id="statTokens">0</div></div>
+          <div class="stat"><div class="sl">Reuse this phase</div><div class="sv" id="statReuse">—</div></div>
+          <div class="stat"><div class="sl">Regime</div><div class="sv" id="statRegime">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="summary" id="summarySection" style="display:none;">
+      <div class="sum-card prefill">
+        <h4>Prefill</h4>
+        <div>32 weight fetches served 5 tokens</div>
+        <div class="sum-bar-bg"><div class="sum-bar pf" id="sumBarPf"></div></div>
+        <div class="sv" id="sumValPf">6.4 fetches / token</div>
+      </div>
+      <div class="sum-card decode">
+        <h4>Decode</h4>
+        <div>96 weight fetches served 3 tokens</div>
+        <div class="sum-bar-bg"><div class="sum-bar dc" id="sumBarDc"></div></div>
+        <div class="sv" id="sumValDc">32 fetches / token</div>
+      </div>
+    </div>
+  </main>
+
+  <footer>d_model=4096, 32 layers, ≈14GB fp16 weights — illustrative numbers modeled loosely on a 7B-class model</footer>
+</div>
+
+<script>
+  function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+  const promptTokens = ['The','capital','of','France','is'];
+  const genTokens = ['Paris', ',', 'a'];
+
+  const tokenStrip = document.getElementById('tokenStrip');
+  const stepTitle = document.getElementById('stepTitle');
+  const stepText = document.getElementById('stepText');
+  const phaseBadge = document.getElementById('phaseBadge');
+  const phaseText = document.getElementById('phaseText');
+  const layerCount = document.getElementById('layerCount');
+  const layerBar = document.getElementById('layerBar');
+  const layerLabelText = document.getElementById('layerLabelText');
+  const kvCount = document.getElementById('kvCount');
+  const kvBar = document.getElementById('kvBar');
+  const statFetches = document.getElementById('statFetches');
+  const statTokens = document.getElementById('statTokens');
+  const statReuse = document.getElementById('statReuse');
+  const statRegime = document.getElementById('statRegime');
+  const nextBtn = document.getElementById('nextBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const progressDots = document.getElementById('progressDots');
+  const summarySection = document.getElementById('summarySection');
+
+  const tiers = ['tier-hbm','tier-l2','tier-l1','tier-reg','tier-core'];
+  function litTier(id, teal){
+    tiers.forEach(t=>{
+      const el = document.getElementById(t);
+      el.classList.remove('hot','hot-teal');
+    });
+    if(id){
+      const el = document.getElementById(id);
+      el.classList.add('hot');
+      if(teal) el.classList.add('hot-teal');
+    }
+  }
+
+  let hbmFetches = 0, tokensProduced = 0, kvTokens = 0;
+  function refreshStats(reuseLabel, regime){
+    statFetches.textContent = hbmFetches;
+    statTokens.textContent = tokensProduced;
+    statReuse.textContent = reuseLabel;
+    statRegime.textContent = regime;
+    kvCount.textContent = kvTokens + ' tokens';
+    kvBar.style.width = Math.min(100, (kvTokens/8)*100) + '%';
+  }
+
+  function renderTokens(activePromptAll, activeGenIdx){
+    tokenStrip.innerHTML = '';
+    promptTokens.forEach((t)=>{
+      const el = document.createElement('div');
+      el.className = 'tok' + (activePromptAll ? ' prompt-active' : '');
+      el.textContent = t;
+      tokenStrip.appendChild(el);
+    });
+    genTokens.slice(0, tokensProduced).forEach((t, idx)=>{
+      const el = document.createElement('div');
+      el.className = 'tok gen' + (idx === activeGenIdx ? ' gen-active' : '');
+      el.textContent = t;
+      tokenStrip.appendChild(el);
+    });
+  }
+
+  async function animateLayerLoop(totalLayers, reusePerLayer, teal, onLayer){
+    layerLabelText.textContent = 'Layer';
+    for(let L=1; L<=totalLayers; L++){
+      layerCount.textContent = `${L} / ${totalLayers}`;
+      layerBar.className = 'layer-bar ' + (teal ? 'prefill-fill' : 'decode-fill');
+      layerBar.style.width = (L/totalLayers*100) + '%';
+
+      litTier('tier-hbm', teal); await wait(18);
+      litTier('tier-l2', teal); await wait(14);
+      litTier('tier-l1', teal); await wait(14);
+      litTier('tier-reg', teal); await wait(14);
+      litTier('tier-core', teal); await wait(18);
+
+      hbmFetches++;
+      if(onLayer) onLayer(L);
+      refreshStats(reusePerLayer, teal ? 'compute-bound' : 'memory-bound');
+    }
+    litTier(null);
+  }
+
+  const steps = [
+    // 0
+    async ()=>{
+      phaseBadge.className='phase-badge prefill'; phaseText.textContent='Idle';
+      stepTitle.textContent = 'The prompt arrives';
+      stepText.innerHTML = 'Your text: <b>"The capital of France is"</b>. Before anything touches the GPU\'s memory hierarchy, it has to become numbers.';
+      renderTokens(false,-1); refreshStats('—','—');
+    },
+    // 1 — tokenize
+    async ()=>{
+      phaseText.textContent='Tokenize';
+      stepTitle.textContent = 'Step 1 — Tokenize';
+      stepText.innerHTML = 'The tokenizer splits the prompt into <b>5 tokens</b>. Each token is just an integer ID right now — no vectors yet.';
+      renderTokens(true,-1);
+    },
+    // 2 — embedding lookup
+    async ()=>{
+      stepTitle.textContent = 'Step 2 — Embedding lookup';
+      stepText.innerHTML = 'Each token ID looks up its row in the <b>embedding table</b>, which lives in HBM alongside every other weight. 5 tokens → 5 rows fetched → a matrix <span class="mono">X (5 × 4096)</span>.';
+      litTier('tier-hbm', true); await wait(300);
+      litTier('tier-core', true); await wait(200);
+      litTier(null);
+    },
+    // 3 — prefill layer loop
+    async ()=>{
+      phaseBadge.className='phase-badge prefill'; phaseText.textContent='PREFILL';
+      stepTitle.textContent = 'Step 3 — Prefill: all 32 layers, all 5 tokens together';
+      stepText.innerHTML = 'For every layer: <span class="teal-b">Q/K/V weights</span> stream HBM → L2 → L1 → registers → <b>Tensor Cores</b> <i>once</i>, then get reused for all 5 tokens before eviction. K/V for each token get written into the KV cache. Watch the layer counter climb.';
+      renderTokens(true,-1);
+      await animateLayerLoop(32, '5 tokens / fetch', true, (L)=>{ kvTokens = Math.round((L/32)*5); refreshStats('5 tokens / fetch','compute-bound'); });
+    },
+    // 4 — sample first token
+    async ()=>{
+      stepTitle.textContent = 'Step 4 — LM head → sample';
+      stepText.innerHTML = 'After the last layer, a final projection (weights → vocabulary size) turns the last token\'s vector into probabilities. Highest probability: <b class="accent-b">"Paris"</b>. Prefill is done — <b>32 weight fetches</b> just served <b>5 tokens</b> of computation.';
+      tokensProduced = 1; kvTokens = 5;
+      renderTokens(true,0);
+      refreshStats('5 tokens / fetch','compute-bound');
+    },
+    // 5 — decode step 1
+    async ()=>{
+      phaseBadge.className='phase-badge decode'; phaseText.textContent='DECODE — step 1';
+      stepTitle.textContent = 'Step 5 — Decode: generate token 2';
+      stepText.innerHTML = 'Only <b>"Paris"</b> needs processing now — but every layer\'s weights still have to make the <span class="accent-b">full trip from HBM</span>, just to serve this one token. Attention also reads the KV cache built during prefill.';
+      renderTokens(false,0);
+      await animateLayerLoop(32, '1 token / fetch', false, (L)=>{});
+      kvTokens = 6; tokensProduced = 1;
+      refreshStats('1 token / fetch','memory-bound');
+    },
+    // 6 — sample token 2, decode step for it
+    async ()=>{
+      stepTitle.textContent = 'Step 6 — Sample, then repeat for token 3';
+      stepText.innerHTML = 'Next token sampled: <b class="accent-b">","</b>. Same story again: 32 fresh weight fetches, this time to produce one comma. KV cache keeps growing.';
+      tokensProduced = 2;
+      renderTokens(false,1);
+      await animateLayerLoop(32, '1 token / fetch', false, (L)=>{});
+      kvTokens = 7;
+      refreshStats('1 token / fetch','memory-bound');
+    },
+    // 7 — decode step 3
+    async ()=>{
+      stepTitle.textContent = 'Step 7 — One more time, for "a"';
+      stepText.innerHTML = 'Sampled: <b class="accent-b">"a"</b>. Same 32-layer, full-weight-reload cycle, for one more single token.';
+      tokensProduced = 3;
+      renderTokens(false,2);
+      await animateLayerLoop(32, '1 token / fetch', false, (L)=>{});
+      kvTokens = 8;
+      refreshStats('1 token / fetch','memory-bound');
+    },
+    // 8 — summary
+    async ()=>{
+      phaseText.textContent='Done';
+      stepTitle.textContent = 'Step 8 — What just happened';
+      stepText.innerHTML = 'Prefill: <b class="teal-b">32 fetches → 5 tokens</b> (6.4 fetches/token). Decode: <b class="accent-b">96 fetches → 3 tokens</b> (32 fetches/token) — <b>5× worse</b>, exactly matching the 5-token batch size prefill got to amortize across. This is the whole memory-bound story, traced end to end.';
+      litTier(null);
+      summarySection.style.display = 'grid';
+      await wait(150);
+      document.getElementById('sumBarPf').style.width = '20%';
+      document.getElementById('sumBarDc').style.width = '100%';
+    }
+  ];
+
+  let idx = -1;
+  function updateDots(){
+    progressDots.innerHTML = '';
+    for(let i=0;i<steps.length;i++){
+      const d = document.createElement('div');
+      d.className = 'pdot' + (i<=idx ? ' done' : '');
+      progressDots.appendChild(d);
+    }
+  }
+  updateDots();
+
+  async function goNext(){
+    nextBtn.disabled = true;
+    idx = Math.min(steps.length-1, idx+1);
+    updateDots();
+    await steps[idx]();
+    nextBtn.disabled = false;
+    if(idx === steps.length-1){ nextBtn.textContent = '✓ Finished'; nextBtn.disabled = true; }
+    else if(idx === 0){ nextBtn.textContent = 'Next →'; }
+  }
+
+  nextBtn.addEventListener('click', goNext);
+  resetBtn.addEventListener('click', ()=>{
+    idx = -1; hbmFetches=0; tokensProduced=0; kvTokens=0;
+    nextBtn.textContent = '▶ Start'; nextBtn.disabled=false;
+    summarySection.style.display = 'none';
+    document.getElementById('sumBarPf').style.width='0%';
+    document.getElementById('sumBarDc').style.width='0%';
+    layerCount.textContent = '0 / 32'; layerBar.style.width='0%';
+    litTier(null);
+    updateDots();
+    steps[0]();
+  });
+
+  steps[0]();
+</script>
+</body>
+</html>

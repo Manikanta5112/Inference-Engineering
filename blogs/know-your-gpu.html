@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Know Your GPU — Ground Up</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0d0f14;
+    --bg-panel: #14161d;
+    --bg-card: #191c25;
+    --line: #2a2e3a;
+    --line-soft: #1e212b;
+    --text: #e6e8ee;
+    --text-dim: #8b90a0;
+    --text-faint: #565b6b;
+    --accent: #e8a355;
+    --teal: #5c8a91;
+    --tan: #a68a5b;
+    --purple: #6a5a8a;
+    --purple-dim: #4a3f6b;
+    --maroon: #7a4a4a;
+    --green: #5c8560;
+    --green-dk: #3f5c46;
+    --blue: #5c7a8a;
+    --font-d: 'Space Grotesk', sans-serif;
+    --font-m: 'JetBrains Mono', monospace;
+    --font-b: 'Inter', sans-serif;
+  }
+  *{ box-sizing: border-box; margin:0; padding:0; }
+  html{ scroll-behavior: smooth; }
+  body{ background: var(--bg); color: var(--text); font-family: var(--font-b); line-height: 1.6; }
+  .wrap{ max-width: 980px; margin: 0 auto; padding: 0 24px; }
+  ::selection{ background: #4a3f2a; }
+
+  /* nav */
+  nav{
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(13,15,20,0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .nav-inner{ max-width: 980px; margin: 0 auto; padding: 14px 24px; display: flex; gap: 22px; overflow-x: auto; align-items: center; }
+  .nav-inner a{ font-family: var(--font-m); font-size: 12px; color: var(--text-dim); text-decoration: none; white-space: nowrap; letter-spacing: 0.02em; transition: color 0.2s; }
+  .nav-inner a:hover{ color: var(--accent); }
+  .nav-brand{ font-family: var(--font-d); font-weight: 700; color: var(--text); font-size: 14px; margin-right: 8px; }
+
+  header.hero{ padding: 88px 0 48px; }
+  .eyebrow{ font-family: var(--font-m); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 20px; display:flex; align-items:center; gap:10px;}
+  .eyebrow::before{ content:''; width:7px; height:7px; border-radius:50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  h1{ font-family: var(--font-d); font-size: clamp(32px,5vw,50px); font-weight: 700; line-height: 1.1; max-width: 16ch; }
+  h1 em{ font-style: normal; color: var(--accent); }
+  .lede{ margin-top: 20px; font-size: 17.5px; color: var(--text-dim); max-width: 60ch; }
+
+  section{ padding: 60px 0; border-top: 1px solid var(--line-soft); }
+  .kicker{ font-family: var(--font-m); font-size: 11.5px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+  h2{ font-family: var(--font-d); font-size: clamp(22px,3.2vw,30px); font-weight: 600; margin-bottom: 14px; }
+  p.body{ color: var(--text-dim); max-width: 64ch; font-size: 15.5px; }
+  p.body + p.body{ margin-top: 10px; }
+  p.body b{ color: var(--text); font-weight: 600; }
+  .mono{ font-family: var(--font-m); }
+
+  /* CPU vs GPU */
+  .compare{ margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .compare-col{ background: var(--bg-card); padding: 22px 20px; }
+  .compare-col h3{ font-family: var(--font-d); font-size: 16px; margin-bottom: 10px; }
+  .compare-col.cpu h3{ color: var(--blue); }
+  .compare-col.gpu h3{ color: var(--accent); }
+  .core-grid{ display: grid; gap: 4px; margin: 14px 0; }
+  .core-grid.cpu-cores{ grid-template-columns: repeat(4, 1fr); }
+  .core-grid.gpu-cores{ grid-template-columns: repeat(16, 1fr); }
+  .core-box{ aspect-ratio: 1; border-radius: 2px; }
+  .cpu-cores .core-box{ background: var(--blue); border-radius: 4px; }
+  .gpu-cores .core-box{ background: var(--accent); opacity: 0.85; }
+  .compare-col p{ font-size: 13.5px; color: var(--text-dim); margin-top: 8px; }
+  .stat-line{ font-family: var(--font-m); font-size: 12px; color: var(--text-faint); margin-top: 10px; }
+
+  @media (max-width: 640px){ .compare{ grid-template-columns: 1fr; } }
+
+  /* nested hierarchy */
+  .hier-diagram{ margin-top: 32px; background: var(--bg-panel); border: 1px solid var(--line); border-radius: 14px; padding: 24px; }
+  .hier-tier{
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 0 auto 12px;
+    background: var(--bg-card); cursor: pointer; transition: border-color 0.2s, transform 0.15s;
+    display:flex; align-items:center; justify-content: space-between; gap: 12px;
+  }
+  .hier-tier:hover{ border-color: var(--accent); transform: translateY(-1px); }
+  .hier-tier.active{ border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .hier-tier .htitle{ font-family: var(--font-d); font-weight: 600; font-size: 14.5px; }
+  .hier-tier .hsub{ font-family: var(--font-m); font-size: 10.5px; color: var(--text-faint); margin-top: 2px; }
+  .hier-tier .hcount{ font-family: var(--font-m); font-size: 13px; color: var(--accent); white-space: nowrap; }
+  .ht-1{ width: 100%; } .ht-2{ width: 84%; } .ht-3{ width: 68%; } .ht-4{ width: 52%; } .ht-5{ width: 36%; margin-bottom:0; }
+  .hier-arrow{ text-align: center; font-family: var(--font-m); font-size: 10px; color: var(--text-faint); margin: 0 0 12px; }
+  .info-panel{
+    margin-top: 18px; background: var(--bg-card); border: 1px dashed var(--line); border-radius: 8px;
+    padding: 14px 16px; font-size: 14px; color: var(--text-dim); min-height: 20px;
+  }
+  .info-panel b{ color: var(--accent); }
+
+  /* kernel structure diagram */
+  .kernel-flow{ margin-top: 32px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .kf-card{ background: var(--bg-card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; cursor: pointer; transition: border-color .2s, transform .15s; }
+  .kf-card:hover{ border-color: var(--accent); transform: translateY(-2px); }
+  .kf-card.active{ border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .kf-card .kf-icon{ font-family: var(--font-m); font-size: 22px; color: var(--accent); margin-bottom: 8px; }
+  .kf-card h4{ font-family: var(--font-d); font-size: 14.5px; margin-bottom: 4px; }
+  .kf-card .kf-sub{ font-family: var(--font-m); font-size: 10.5px; color: var(--text-faint); }
+  .kf-maps-to{ margin-top: 8px; font-size: 11.5px; color: var(--text-dim); font-family: var(--font-m); }
+  @media (max-width: 720px){ .kernel-flow{ grid-template-columns: 1fr 1fr; } }
+
+  /* SM diagram — mirrors real block-diagram style */
+  .sm-outer{
+    margin-top: 32px;
+    background: #101319; border: 1px solid var(--line); border-radius: 14px; padding: 18px;
+  }
+  .sm-label{ font-family: var(--font-d); font-weight: 700; color: var(--accent); font-size: 15px; margin-bottom: 12px; }
+  .sm-bar{ background: var(--blue); border-radius: 6px; padding: 8px 12px; text-align:center; font-family: var(--font-m); font-size: 11.5px; margin-bottom: 8px; opacity: 0.9;}
+  .sm-partitions{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .partition{ background: #171a22; border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+  .p-row{ border-radius: 5px; padding: 5px 9px; font-family: var(--font-m); font-size: 10px; text-align: center; margin-bottom: 4px; cursor: pointer; transition: filter 0.15s, transform 0.1s; }
+  .p-row:hover{ filter: brightness(1.25); transform: scale(1.01); }
+  .p-row.active-glow{ box-shadow: 0 0 0 1.5px var(--accent); }
+  .p-l0{ background: var(--teal); color: #fff; }
+  .p-warp{ background: var(--tan); color: #1a140a; font-weight: 700; }
+  .p-dispatch{ background: var(--tan); color: #1a140a; opacity: 0.75; }
+  .p-reg{ background: var(--purple-dim); color: #fff; }
+  .p-tensormem{ background: var(--purple); color: #fff; font-size: 9.5px; text-align: center; padding: 3px; }
+  .core-row{ display: grid; grid-template-columns: repeat(4, 1fr) 1.1fr; gap: 3px; margin-bottom: 4px; }
+  .core-cell{ border-radius: 4px; padding: 3px 2px; text-align:center; font-family: var(--font-m); font-size: 7.5px; height: 68px; display:flex; flex-direction:column; justify-content:flex-start; align-items:center; cursor: pointer; transition: filter 0.15s;}
+  .core-cell:hover{ filter: brightness(1.25); }
+  .c-int{ background: var(--maroon); color: #f3dede; }
+  .c-fp32{ background: var(--green); color: #e2f0e4; }
+  .c-fp64{ background: var(--green-dk); color: #d7e6da; }
+  .c-tensor{ background: var(--purple); color: #ece7f5; }
+  .ldst-row{ display: grid; grid-template-columns: repeat(8, 1fr) 1.2fr; gap: 3px; }
+  .ldst-cell{ background: #2a3140; color: var(--text-dim); border-radius: 3px; font-family: var(--font-m); font-size: 7px; text-align: center; padding: 3px 0; cursor: pointer; }
+  .sfu-cell{ background: var(--blue); color: #fff; border-radius: 3px; font-family: var(--font-m); font-size: 8px; text-align: center; padding: 3px 0; cursor: pointer; }
+  .sm-tma{ background: var(--green-dk); color: #e2f0e4; border-radius: 6px; padding: 8px; text-align:center; font-family: var(--font-m); font-size: 11px; margin-bottom: 8px; cursor: pointer; }
+  .sm-l1{ background: var(--blue); color: #fff; border-radius: 6px; padding: 8px; text-align:center; font-family: var(--font-m); font-size: 11px; margin-bottom: 8px; cursor: pointer; }
+  .sm-tex-row{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .sm-tex{ background: var(--green-dk); color: #e2f0e4; border-radius: 6px; padding: 7px; text-align:center; font-family: var(--font-m); font-size: 10.5px; cursor: pointer; }
+
+  /* kernel launch stepper */
+  .launch-box{ margin-top: 32px; background: var(--bg-panel); border: 1px solid var(--line); border-radius: 14px; padding: 26px; }
+  .launch-head{ display:flex; align-items:center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;}
+  button.step-btn{ font-family: var(--font-m); background: var(--accent); color: #1a1206; border:none; padding: 9px 18px; border-radius: 8px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+  button.step-btn:hover{ background: #f0b46e; }
+  button.step-btn.secondary{ background: transparent; border: 1px solid var(--line); color: var(--text-dim); }
+  .launch-status{ font-family: var(--font-m); font-size: 13px; color: var(--accent); min-height: 18px; }
+  .launch-track{ display: flex; gap: 6px; margin-bottom: 20px; }
+  .launch-dot{ flex:1; height: 5px; border-radius: 3px; background: var(--line); transition: background 0.3s; }
+  .launch-dot.done{ background: var(--accent); }
+  .launch-visual{ min-height: 130px; background: var(--bg-card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; display:flex; align-items:center; justify-content:center; text-align:center; font-family: var(--font-m); font-size: 13.5px; color: var(--text-dim); }
+  .launch-visual b{ color: var(--accent); }
+
+  /* glossary */
+  .glossary{ margin-top: 32px; display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .g-item{ background: var(--bg-card); }
+  .g-head{ padding: 15px 18px; display:flex; align-items:center; justify-content: space-between; cursor: pointer; }
+  .g-head .term{ font-family: var(--font-d); font-weight: 600; font-size: 15px; }
+  .g-head .chev{ font-family: var(--font-m); color: var(--text-faint); transition: transform 0.2s; }
+  .g-item.open .chev{ transform: rotate(45deg); }
+  .g-body{ max-height: 0; overflow: hidden; transition: max-height 0.3s ease, padding 0.3s ease; padding: 0 18px; font-size: 14px; color: var(--text-dim); }
+  .g-item.open .g-body{ max-height: 200px; padding: 0 18px 16px; }
+
+  footer{ padding: 48px 0 80px; color: var(--text-faint); font-size: 12px; font-family: var(--font-m); text-align: center; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <span class="nav-brand">◆ GPU/101</span>
+    <a href="#why">Why GPUs</a>
+    <a href="#hierarchy">Chip hierarchy</a>
+    <a href="#kernel">Kernel & threads</a>
+    <a href="#sm">Inside an SM</a>
+    <a href="#memory">Memory</a>
+    <a href="#launch">Kernel launch</a>
+    <a href="#glossary">Glossary</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">Ground level to bird's-eye</div>
+    <h1>Get to know your <em>GPU</em>, from a single core to a full kernel launch.</h1>
+    <p class="lede">One continuous walk: why GPUs look the way they do, how the chip is organized, what a <b>kernel</b> actually is, what's inside one SM, and how all of it cooperates to run your code — click through the diagrams as you go.</p>
+  </header>
+
+  <section id="why">
+    <div class="kicker">00 — First principles</div>
+    <h2>A CPU has few, powerful workers. A GPU has thousands of small ones.</h2>
+    <p class="body">A CPU core is built to run <b>one complex, branchy sequence of instructions</b> as fast as possible — big caches, aggressive out-of-order execution, branch prediction. A GPU core is built to do <b>one simple operation, repeated across enormous amounts of data at once</b>. Matrix multiply, the operation behind almost all deep learning, is exactly that: the same multiply-add, over and over, on different numbers. That's why GPUs trade a few fast cores for thousands of small, simple ones.</p>
+
+    <div class="compare">
+      <div class="compare-col cpu">
+        <h3>CPU</h3>
+        <div class="core-grid cpu-cores">
+          <div class="core-box"></div><div class="core-box"></div><div class="core-box"></div><div class="core-box"></div>
+          <div class="core-box"></div><div class="core-box"></div><div class="core-box"></div><div class="core-box"></div>
+        </div>
+        <p>~8–64 large, general-purpose cores. Each one is great at running a different, complicated task.</p>
+        <div class="stat-line">optimized for: latency of one task</div>
+      </div>
+      <div class="compare-col gpu">
+        <h3>GPU</h3>
+        <div class="core-grid gpu-cores" id="gpuCoreGrid"></div>
+        <p>Thousands of small cores, grouped so they all execute the <b>same instruction</b> on different data, simultaneously.</p>
+        <div class="stat-line">optimized for: throughput across many tasks</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="hierarchy">
+    <div class="kicker">01 — The bird's-eye map</div>
+    <h2>A GPU is nested boxes, like a company org chart</h2>
+    <p class="body">Click each tier below — this is the physical chip, from the whole device down to a single core. Every tier exists to solve one problem: how do you keep thousands of cores fed with work and data without everything colliding.</p>
+
+    <div class="hier-diagram">
+      <div class="hier-tier ht-1" data-key="gpu"><div><div class="htitle">GPU (the whole chip)</div><div class="hsub">one physical device</div></div><div class="hcount">1</div></div>
+      <div class="hier-arrow">↓ split into clusters</div>
+      <div class="hier-tier ht-2" data-key="gpc"><div><div class="htitle">GPC — GPU Processing Cluster</div><div class="hsub">a self-contained mini-GPU</div></div><div class="hcount">~8</div></div>
+      <div class="hier-arrow">↓ split further</div>
+      <div class="hier-tier ht-3" data-key="tpc"><div><div class="htitle">TPC — Texture Processing Cluster</div><div class="hsub">pairs of SMs</div></div><div class="hcount">~9 per GPC</div></div>
+      <div class="hier-arrow">↓ contains</div>
+      <div class="hier-tier ht-4" data-key="sm"><div><div class="htitle">SM — Streaming Multiprocessor</div><div class="hsub">the actual "worker unit" — jump to section 03</div></div><div class="hcount">~132 total</div></div>
+      <div class="hier-arrow">↓ contains</div>
+      <div class="hier-tier ht-5" data-key="core"><div><div class="htitle">Cores (INT32 / FP32 / Tensor)</div><div class="hsub">where one instruction actually executes</div></div><div class="hcount">1000s</div></div>
+
+      <div class="info-panel" id="hierInfo">click a tier above to read about it — numbers are illustrative, based on a large modern datacenter GPU (~132 SMs)</div>
+    </div>
+  </section>
+
+  <section id="kernel">
+    <div class="kicker">02 — The software side</div>
+    <h2>What a "kernel" actually is</h2>
+    <p class="body">A <b>kernel</b> is the function you write and launch to run on the GPU — the compiled code, not a piece of hardware. When you launch one, the driver doesn't run it once — it spins up a massive number of copies, organized into a strict hierarchy that mirrors the hardware hierarchy above. Click through:</p>
+
+    <div class="kernel-flow" id="kernelFlow">
+      <div class="kf-card" data-key="grid"><div class="kf-icon">▦</div><h4>Grid</h4><div class="kf-sub">the whole kernel launch</div><div class="kf-maps-to">→ maps to the GPU</div></div>
+      <div class="kf-card" data-key="block"><div class="kf-icon">▤</div><h4>Block</h4><div class="kf-sub">a group of threads</div><div class="kf-maps-to">→ maps to one SM</div></div>
+      <div class="kf-card" data-key="warp"><div class="kf-icon">▥</div><h4>Warp</h4><div class="kf-sub">32 threads, lockstep</div><div class="kf-maps-to">→ maps to one partition</div></div>
+      <div class="kf-card" data-key="thread"><div class="kf-icon">▪</div><h4>Thread</h4><div class="kf-sub">one lane of execution</div><div class="kf-maps-to">→ maps to one core</div></div>
+    </div>
+    <div class="info-panel" id="kernelInfo">click a card above — this is the exact ladder your code climbs down before it touches silicon</div>
+  </section>
+
+  <section id="sm">
+    <div class="kicker">03 — Zooming all the way in</div>
+    <h2>Inside one Streaming Multiprocessor</h2>
+    <p class="body">This is the diagram you shared, rebuilt — click any block for a plain-English explanation. An SM is split into <b>4 identical partitions</b>, so it can juggle 4 warps' worth of instructions every cycle instead of just one.</p>
+
+    <div class="sm-outer">
+      <div class="sm-label">SM</div>
+      <div class="sm-bar" data-key="l1i">L1 Instruction Cache</div>
+      <div class="sm-partitions" id="smPartitions"></div>
+      <div class="sm-tma" data-key="tma">Tensor Memory Accelerator</div>
+      <div class="sm-l1" data-key="l1d">256 KB L1 Data Cache / Shared Memory</div>
+      <div class="sm-tex-row">
+        <div class="sm-tex" data-key="tex">Tex</div><div class="sm-tex" data-key="tex">Tex</div>
+        <div class="sm-tex" data-key="tex">Tex</div><div class="sm-tex" data-key="tex">Tex</div>
+      </div>
+    </div>
+    <div class="info-panel" id="smInfo">click any block in the diagram above</div>
+  </section>
+
+  <section id="memory">
+    <div class="kicker">04 — The recap</div>
+    <h2>Where the data lives while all this happens</h2>
+    <p class="body">Every core above pulls its operands from the same nested memory system: <b class="mono">registers</b> (private to a thread, inside the partition) → <b class="mono">L1 / shared memory</b> (the 256KB block you just clicked, shared by the whole SM) → <b class="mono">L2</b> (shared by every SM on the chip) → <b class="mono">HBM/VRAM</b> (the whole 80GB+ pool, off-chip). Small and fast near the cores, huge and slow far from them — the entire performance story of a GPU kernel is how well it reuses data at the small-fast end before it has to go back to the big-slow end.</p>
+  </section>
+
+  <section id="launch">
+    <div class="kicker">05 — Putting it all together</div>
+    <h2>Watch a kernel launch, step by step</h2>
+    <p class="body">This ties every section above into one sequence — from you calling a function, to a single core doing one multiply-add.</p>
+
+    <div class="launch-box">
+      <div class="launch-head">
+        <div style="display:flex; gap:10px;">
+          <button class="step-btn" id="nextStep">Next step →</button>
+          <button class="step-btn secondary" id="resetStep">Reset</button>
+        </div>
+        <div class="launch-status" id="launchStatus">step 0 of 7 — press "Next step"</div>
+      </div>
+      <div class="launch-track" id="launchTrack"></div>
+      <div class="launch-visual" id="launchVisual">Your kernel hasn't been launched yet.</div>
+    </div>
+  </section>
+
+  <section id="glossary">
+    <div class="kicker">06 — Quick reference</div>
+    <h2>Glossary</h2>
+    <div class="glossary" id="glossaryList"></div>
+  </section>
+
+  <footer>figures are illustrative, modeled loosely on a large modern datacenter GPU (~132 SMs) · not exact specs for any single product</footer>
+</div>
+
+<script>
+  /* ---------- CPU vs GPU core grid ---------- */
+  const gpuGrid = document.getElementById('gpuCoreGrid');
+  for(let i=0;i<64;i++){ const d=document.createElement('div'); d.className='core-box'; gpuGrid.appendChild(d); }
+
+  /* ---------- hierarchy diagram ---------- */
+  const hierInfo = {
+    gpu: "The entire physical chip. One GPU contains everything below it — every cluster, every core, every byte of VRAM. When you run a model, you're renting time on this whole device.",
+    gpc: "A GPC (GPU Processing Cluster) is essentially a mini-GPU-within-the-GPU — it groups a chunk of the chip's SMs together along with supporting raster/scheduling hardware. Large chips have several of these to keep work distribution manageable.",
+    tpc: "A TPC groups a small number of SMs (often 2) that share some lightweight resources. It's a scheduling convenience layer — you rarely program 'at' this level, but it's part of how work gets spread across the chip.",
+    sm: "The Streaming Multiprocessor is the real workhorse — the unit that actually fetches instructions, schedules warps, and executes them. A big datacenter GPU has on the order of a hundred-plus of these running independently and in parallel. Section 03 goes all the way inside one.",
+    core: "The individual execution units — INT32, FP32, FP64, and Tensor Core — sitting inside each SM partition. This is where one instruction, for one thread, on one piece of data, actually executes on a wire."
+  };
+  document.querySelectorAll('#hierarchy .hier-tier').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      document.querySelectorAll('#hierarchy .hier-tier').forEach(t=>t.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('hierInfo').innerHTML = hierInfo[el.dataset.key];
+    });
+  });
+
+  /* ---------- kernel flow ---------- */
+  const kernelInfo = {
+    grid: "The <b>grid</b> is everything you get when you launch a kernel — the entire set of threads that will run that function, organized as blocks. Launching a kernel means saying: 'run this function, this many times, all at once.' The grid is scheduled across the whole GPU.",
+    block: "A <b>block</b> is a group of threads (commonly a few hundred) that the scheduler commits to running together on a <b>single SM</b>. Threads within one block can share the SM's L1/shared memory and synchronize with each other — threads in different blocks generally can't, cheaply.",
+    warp: "A <b>warp</b> is 32 threads from the same block, executing the exact same instruction in lockstep, one thread per lane. This is why GPUs are called SIMT (single instruction, multiple threads). One SM partition's warp scheduler picks one ready warp per cycle to issue.",
+    thread: "A <b>thread</b> is the smallest unit — one lane of execution, one copy of your kernel code, working on its own slice of the data (e.g. one output element of a matmul). It runs on one core, for the duration of its warp's instruction."
+  };
+  document.querySelectorAll('#kernelFlow .kf-card').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      document.querySelectorAll('#kernelFlow .kf-card').forEach(t=>t.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('kernelInfo').innerHTML = kernelInfo[el.dataset.key];
+    });
+  });
+
+  /* ---------- SM diagram (built to mirror the reference image) ---------- */
+  const smPartitionsEl = document.getElementById('smPartitions');
+  function buildPartition(){
+    const p = document.createElement('div');
+    p.className = 'partition';
+    p.innerHTML = `
+      <div class="p-row p-l0" data-key="l0i">L0 Instruction Cache</div>
+      <div class="p-row p-warp" data-key="warpsched">Warp Scheduler</div>
+      <div class="p-row p-dispatch" data-key="dispatch">Dispatch Unit</div>
+      <div class="p-row p-reg" data-key="regfile">Register File (16,384 × 32-bit)</div>
+      <div class="p-row p-tensormem" data-key="tensormem">Tensor Memory</div>
+      <div class="core-row">
+        <div class="core-cell c-int" data-key="int32">INT32</div>
+        <div class="core-cell c-fp32" data-key="fp32">FP32</div>
+        <div class="core-cell c-fp32" data-key="fp32">FP32</div>
+        <div class="core-cell c-fp64" data-key="fp64">FP64</div>
+        <div class="core-cell c-tensor" data-key="tensorcore">TENSOR<br>CORE</div>
+      </div>
+      <div class="ldst-row">
+        <div class="ldst-cell" data-key="ldst">L0/ST</div><div class="ldst-cell" data-key="ldst">L0/ST</div>
+        <div class="ldst-cell" data-key="ldst">L0/ST</div><div class="ldst-cell" data-key="ldst">L0/ST</div>
+        <div class="ldst-cell" data-key="ldst">L0/ST</div><div class="ldst-cell" data-key="ldst">L0/ST</div>
+        <div class="ldst-cell" data-key="ldst">L0/ST</div><div class="ldst-cell" data-key="ldst">L0/ST</div>
+        <div class="sfu-cell" data-key="sfu">SFU</div>
+      </div>
+    `;
+    return p;
+  }
+  for(let i=0;i<4;i++) smPartitionsEl.appendChild(buildPartition());
+
+  const smInfo = {
+    l1i: "Holds compiled instructions for the whole SM, shared by all 4 partitions — the first stop before an instruction reaches a partition's own smaller L0 cache.",
+    l0i: "A smaller, per-partition instruction cache — keeps the currently-executing warp's instructions as close as possible to the scheduler, so fetching 'what's next' is fast.",
+    warpsched: "Picks which resident warp gets to issue its next instruction this cycle. With many warps parked on one partition, if one warp is stalled waiting on a slow memory load, the scheduler just switches to a different ready warp — this is how GPUs hide memory latency instead of stalling on it.",
+    dispatch: "Takes the warp the scheduler picked and sends its instruction to the correct execution unit below (INT32, FP32, Tensor Core, etc).",
+    regfile: "Private, per-thread storage — the fastest memory that exists, and the only place arithmetic can actually read/write from. 16,384 32-bit registers are split across all threads resident on this partition.",
+    tensormem: "A newer on-chip staging area (Blackwell-class) sitting right next to the Tensor Core, reducing how often tensor-core operands need a full trip out to shared memory.",
+    int32: "Executes integer instructions — indexing, address calculation, loop counters.",
+    fp32: "Executes standard 32-bit floating point math — the default precision for most non-matmul GPU compute.",
+    fp64: "Executes double-precision float math — much rarer in deep learning, important for scientific/HPC workloads that need more numerical precision.",
+    tensorcore: "A specialized unit that does an entire small matrix multiply-accumulate in one operation, instead of one multiply-add at a time. This is the unit our earlier matmul tiles actually run on — it's why tensor cores are dramatically faster than doing matmuls on FP32 cores.",
+    ldst: "Load/Store units — execute the actual 'move data' instructions: pulling a tile from shared memory into registers, or writing a result back out. This is the hardware doing the literal trip in our earlier tile-flow animation.",
+    sfu: "Special Function Unit — computes transcendental functions (exp, log, sqrt, reciprocal) faster than doing them via basic arithmetic. Relevant whenever a kernel needs softmax, normalization, or activation functions.",
+    tma: "Tensor Memory Accelerator — asynchronously copies whole tiles directly from HBM into shared memory in the background, without a thread having to babysit the copy. A dedicated 'mover' for exactly the HBM → L1 hop.",
+    l1d: "Shared by all 4 partitions on this SM — the 'cutting board' from the kitchen analogy. Threads within the same block use this to share data and cooperate.",
+    tex: "Texture units — graphics-heritage hardware, occasionally repurposed by compute kernels for cached, filtered reads."
+  };
+  document.querySelectorAll('.sm-outer [data-key]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      document.querySelectorAll('.sm-outer [data-key]').forEach(t=>t.classList.remove('active-glow'));
+      document.querySelectorAll(`.sm-outer [data-key="${el.dataset.key}"]`).forEach(t=>t.classList.add('active-glow'));
+      document.getElementById('smInfo').innerHTML = `<b>${el.textContent.trim().replace(/\s+/g,' ')}</b> — ${smInfo[el.dataset.key]}`;
+    });
+  });
+
+  /* ---------- kernel launch stepper ---------- */
+  const steps = [
+    "Idle. Your Python/CUDA code hasn't called the kernel yet.",
+    "<b>Launch.</b> You call the kernel with a grid size — e.g. 'run this function across 10,000 blocks of 256 threads each.' The driver hands this grid to the GPU's scheduler.",
+    "<b>Blocks get distributed.</b> The global scheduler assigns blocks to whichever SMs (of the ~132) have free capacity — one SM can hold several blocks at once if it has room.",
+    "<b>Each SM splits its block into warps.</b> A 256-thread block becomes 8 warps of 32 threads, spread across the SM's 4 partitions.",
+    "<b>Warp scheduler takes over.</b> Each partition's scheduler picks a ready warp every cycle and dispatches its next instruction — switching to another warp instantly if one stalls on memory.",
+    "<b>Data streams in.</b> Load/Store units (and the TMA) pull the tiles that instruction needs, down through L2 → L1/shared memory → registers, exactly like the memory hierarchy walkthrough.",
+    "<b>Execution.</b> The dispatched instruction actually runs — an FP32 core does an add, a Tensor Core does a whole tile's multiply-accumulate — one instruction, 32 threads, in lockstep.",
+    "<b>Write-back.</b> Results flow back out through the same hierarchy to HBM. Once every block finishes, the kernel is done and control returns to your program."
+  ];
+  let stepIdx = 0;
+  const track = document.getElementById('launchTrack');
+  for(let i=0;i<steps.length-1;i++){ const d=document.createElement('div'); d.className='launch-dot'; track.appendChild(d); }
+  const dots = track.children;
+  const visual = document.getElementById('launchVisual');
+  const status = document.getElementById('launchStatus');
+  function renderStep(){
+    visual.innerHTML = steps[stepIdx];
+    status.textContent = `step ${stepIdx} of ${steps.length-1}`;
+    for(let i=0;i<dots.length;i++){ dots[i].classList.toggle('done', i < stepIdx); }
+  }
+  document.getElementById('nextStep').addEventListener('click', ()=>{
+    stepIdx = Math.min(steps.length-1, stepIdx+1);
+    renderStep();
+  });
+  document.getElementById('resetStep').addEventListener('click', ()=>{
+    stepIdx = 0; renderStep();
+  });
+  renderStep();
+
+  /* ---------- glossary ---------- */
+  const terms = [
+    ["Kernel", "The function you write and launch to run on the GPU — the software, not a hardware block. Compiled down to instructions that get issued to cores."],
+    ["Grid / Block / Thread", "The three-level structure of a kernel launch: grid = the whole launch, block = a group of threads that run together on one SM, thread = one lane doing one slice of the work."],
+    ["Warp", "32 threads from the same block that execute one instruction in lockstep — the actual scheduling unit inside an SM."],
+    ["SIMT", "Single Instruction, Multiple Threads — NVIDIA's term for how a warp works: one instruction stream, many data lanes executing it simultaneously."],
+    ["SM (Streaming Multiprocessor)", "The core 'worker' unit of a GPU — fetches instructions, schedules warps, and holds the registers/execution units that actually run your code."],
+    ["GPC / TPC", "Larger organizational clusters that group SMs together for scheduling and physical layout — you rarely program 'at' these levels directly."],
+    ["Occupancy", "How many warps are actually resident and ready to run on an SM at once, out of the maximum it could hold. Low occupancy means the scheduler has fewer options to hide memory stalls."],
+    ["Warp divergence", "When threads within the same warp take different branches (e.g. an if/else) — the warp has to execute both paths serially, masking off threads that don't apply, hurting efficiency."],
+    ["Tensor Core", "A specialized unit that executes a small matrix multiply-accumulate as a single operation — the hardware that makes modern deep learning fast."],
+    ["Register spilling", "When a thread needs more registers than the partition can spare, the excess is 'spilled' to local memory (which lives in slower L1/L2), silently hurting performance."],
+    ["Bandwidth vs FLOPs", "Bandwidth = how fast bytes move between memory tiers. FLOPs = how many math operations the cores can do per second. Whichever one a kernel runs out of first is its bottleneck — see the arithmetic intensity notes for the full derivation."]
+  ];
+  const glossaryEl = document.getElementById('glossaryList');
+  terms.forEach(([term, def])=>{
+    const item = document.createElement('div');
+    item.className = 'g-item';
+    item.innerHTML = `<div class="g-head"><div class="term">${term}</div><div class="chev">+</div></div><div class="g-body">${def}</div>`;
+    item.querySelector('.g-head').addEventListener('click', ()=> item.classList.toggle('open'));
+    glossaryEl.appendChild(item);
+  });
+</script>
+</body>
+</html>

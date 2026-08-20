@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notes — FLOPs, Bytes & Arithmetic Intensity</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #f4f2ea;
+    --grid-line: #c7d3dc;
+    --ink: #21262d;
+    --ink-soft: #4b5563;
+    --red-pen: #b3413a;
+    --blue-pen: #2f6fa8;
+    --green-marker: #4a7a3d;
+    --highlight-x: #ffe08a;
+    --highlight-w: #a9d5e8;
+    --highlight-o: #f7c9b6;
+    --sticky: #fff3b0;
+    --font-hand: 'Kalam', cursive;
+    --font-serif: 'Source Serif 4', serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+  *{ box-sizing: border-box; }
+  body{
+    margin:0;
+    background: var(--paper);
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 26px 26px;
+    color: var(--ink);
+    font-family: var(--font-serif);
+    font-size: 17px;
+    line-height: 1.65;
+  }
+  .page{
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 56px 48px 56px 84px;
+    position: relative;
+  }
+  /* spiral binding on the left */
+  .binding{
+    position: absolute; left: 0; top: 0; bottom: 0; width: 48px;
+    border-right: 2px solid #d8beb0;
+    background: repeating-linear-gradient(#f4f2ea, #f4f2ea 34px, transparent 34px, transparent 46px);
+  }
+  .binding::before{
+    content: '';
+    position: absolute; left: 20px; top: 0; bottom: 0; width: 0;
+    border-left: 3px dashed #c98f7c;
+    opacity: 0.55;
+  }
+  .ring{
+    position: absolute; left: 12px; width: 16px; height: 16px;
+    border-radius: 50%; background: var(--paper);
+    border: 3px solid #9aa3ad;
+  }
+
+  h1{
+    font-family: var(--font-hand);
+    font-weight: 700;
+    font-size: 40px;
+    color: var(--ink);
+    margin: 0 0 4px;
+    transform: rotate(-0.4deg);
+  }
+  .date-tag{
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 28px;
+  }
+  h2{
+    font-family: var(--font-hand);
+    font-size: 26px;
+    color: var(--red-pen);
+    margin: 46px 0 6px;
+    transform: rotate(-0.3deg);
+  }
+  h2 .num{ color: var(--ink-soft); font-family: var(--font-mono); font-size: 16px; margin-right: 8px; }
+  p{ margin: 12px 0; color: var(--ink); }
+  .lede{ font-size: 18px; color: var(--ink-soft); }
+  b{ color: var(--ink); }
+  .pen-blue{ color: var(--blue-pen); font-weight: 600; }
+  .pen-red{ color: var(--red-pen); font-weight: 600; }
+  .pen-green{ color: var(--green-marker); font-weight: 600; }
+  code, .mono{ font-family: var(--font-mono); }
+
+  /* sticky note */
+  .sticky{
+    background: var(--sticky);
+    box-shadow: 3px 4px 8px rgba(0,0,0,0.18);
+    padding: 14px 16px;
+    font-family: var(--font-hand);
+    font-size: 16px;
+    line-height: 1.4;
+    max-width: 320px;
+    transform: rotate(-1.4deg);
+    margin: 20px 0;
+    position: relative;
+  }
+  .sticky::before{
+    content:'';
+    position:absolute; top:-8px; left: 40%;
+    width: 44px; height: 16px;
+    background: rgba(255,255,255,0.55);
+    border: 1px solid rgba(0,0,0,0.06);
+    transform: rotate(-4deg);
+  }
+
+  /* matrix grids */
+  .matrices{
+    display: flex; gap: 28px; align-items: center; flex-wrap: wrap;
+    margin: 26px 0;
+    justify-content: center;
+  }
+  .matrix-block{ text-align: center; }
+  .matrix-name{ font-family: var(--font-hand); font-size: 19px; margin-bottom: 6px; }
+  .matrix-dims{ font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); margin-bottom: 8px; }
+  .mgrid{
+    display: grid;
+    gap: 4px;
+    background: #00000012;
+    padding: 6px;
+    border-radius: 6px;
+    border: 1.5px solid var(--ink);
+  }
+  .cell{
+    width: 44px; height: 40px;
+    background: #fdfcf7;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-size: 14px; font-weight: 600;
+    border-radius: 3px;
+    border: 1px solid #d6d0c2;
+    cursor: default;
+    transition: background 0.35s ease, transform 0.15s ease, border-color 0.35s ease;
+    position: relative;
+  }
+  .cell.o-cell{ cursor: pointer; }
+  .cell.o-cell:hover{ transform: translateY(-2px); border-color: var(--ink); }
+  .cell.x-hl{ background: var(--highlight-x); border-color: #d9a916; }
+  .cell.w-hl{ background: var(--highlight-w); border-color: #3d87ad; }
+  .cell.o-hl{ background: var(--highlight-o); border-color: var(--red-pen); }
+  .op-symbol{ font-family: var(--font-hand); font-size: 26px; color: var(--ink-soft); align-self: center; }
+
+  .formula-strip{
+    margin-top: 18px;
+    font-family: var(--font-mono);
+    font-size: 14.5px;
+    background: #fdfcf7;
+    border: 1.5px dashed var(--ink-soft);
+    border-radius: 8px;
+    padding: 12px 16px;
+    text-align: center;
+    min-height: 22px;
+  }
+  .hint{ text-align:center; font-family: var(--font-hand); color: var(--ink-soft); font-size: 15px; margin-top: 6px;}
+
+  /* usage badge */
+  .badge{
+    position: absolute; top: -8px; right: -8px;
+    background: var(--red-pen); color: #fff;
+    font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+    border-radius: 50%; width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 0 2px var(--paper);
+  }
+
+  /* derivation box */
+  .derivation{
+    font-family: var(--font-mono);
+    font-size: 15px;
+    background: #fdfcf7;
+    border-left: 4px solid var(--red-pen);
+    padding: 14px 18px;
+    margin: 18px 0;
+    line-height: 1.9;
+  }
+  .derivation .step{ color: var(--ink-soft); }
+  .derivation .result{ color: var(--red-pen); font-weight: 700; }
+
+  /* connect-dots underline */
+  .underline-note{
+    text-decoration: none;
+    background-image: linear-gradient(transparent 70%, var(--highlight-x) 70%);
+  }
+
+  /* slider demo */
+  .intensity-lab{
+    margin: 26px 0;
+    border: 1.5px solid var(--ink);
+    border-radius: 10px;
+    background: #fdfcf7cc;
+    padding: 22px 24px;
+  }
+  .lab-row{ display: flex; gap: 22px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+  .lab-field label{ font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); text-transform: uppercase; display:block; margin-bottom: 4px;}
+  select, input[type=range]{ font-family: var(--font-mono); }
+  select{ padding: 4px 8px; border-radius: 5px; border: 1px solid var(--ink-soft); background: #fff; }
+  input[type=range]{ width: 220px; }
+  .lab-readout{
+    font-family: var(--font-mono);
+    font-size: 13.5px;
+    display: grid;
+    grid-template-columns: repeat(4, auto);
+    gap: 6px 26px;
+    margin-bottom: 18px;
+  }
+  .lab-readout .k{ color: var(--ink-soft); }
+  .lab-readout .v{ color: var(--red-pen); font-weight: 700; }
+
+  .roofline{
+    position: relative;
+    height: 54px;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #f6d9c9 0%, #f6d9c9 55%, #cfe6d1 55%, #cfe6d1 100%);
+    border: 1px solid var(--ink-soft);
+    overflow: visible;
+  }
+  .roofline .zone-label{
+    position: absolute; top: 6px; font-family: var(--font-hand); font-size: 13px; color: var(--ink);
+  }
+  .zl-mem{ left: 10px; }
+  .zl-comp{ right: 10px; }
+  .marker{
+    position: absolute; top: -10px; width: 3px; height: 74px;
+    background: var(--red-pen);
+    transition: left 0.25s ease;
+  }
+  .marker::after{
+    content: attr(data-label);
+    position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+    font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--red-pen);
+    white-space: nowrap;
+  }
+  .lab-note{ font-family: var(--font-hand); font-size: 15px; color: var(--ink-soft); margin-top: 26px; }
+
+  footer{
+    margin-top: 60px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-soft);
+    text-align: center;
+  }
+
+  @media (max-width: 640px){
+    .page{ padding: 40px 20px 40px 56px; }
+    .cell{ width: 34px; height: 32px; font-size: 11px; }
+    h1{ font-size: 30px; }
+  }
+</style>
+</head>
+<body>
+<div class="binding">
+  <div class="ring" style="top: 40px;"></div>
+  <div class="ring" style="top: 140px;"></div>
+  <div class="ring" style="top: 240px;"></div>
+  <div class="ring" style="top: 340px;"></div>
+  <div class="ring" style="top: 440px;"></div>
+  <div class="ring" style="top: 540px;"></div>
+  <div class="ring" style="top: 640px;"></div>
+  <div class="ring" style="top: 740px;"></div>
+  <div class="ring" style="top: 840px;"></div>
+  <div class="ring" style="top: 940px;"></div>
+  <div class="ring" style="top: 1040px;"></div>
+  <div class="ring" style="top: 1140px;"></div>
+  <div class="ring" style="top: 1240px;"></div>
+  <div class="ring" style="top: 1340px;"></div>
+  <div class="ring" style="top: 1440px;"></div>
+</div>
+
+<div class="page">
+  <h1>FLOPs, bytes, and why batching matters</h1>
+  <div class="date-tag">matmul notes · X @ W → O</div>
+
+  <p class="lede">One small worked example, followed all the way through: how many multiplications happen, how many bytes have to travel from HBM, and what that ratio tells you about whether the GPU is <span class="pen-red">waiting on memory</span> or <span class="pen-blue">actually computing</span>.</p>
+
+  <h2><span class="num">01</span>The setup</h2>
+  <p>Take a tiny concrete case so every number is checkable by hand: <code>X</code> is (n=2, d=3), <code>W</code> is (d=3, d=3), and <code>O = X @ W</code> is (n=2, d=3).</p>
+
+  <div class="matrices">
+    <div class="matrix-block">
+      <div class="matrix-name">X</div>
+      <div class="matrix-dims">(n=2, d=3)</div>
+      <div class="mgrid" id="gridX" style="grid-template-columns: repeat(3, 44px);"></div>
+    </div>
+    <div class="op-symbol">×</div>
+    <div class="matrix-block">
+      <div class="matrix-name">W</div>
+      <div class="matrix-dims">(d=3, d=3)</div>
+      <div class="mgrid" id="gridW" style="grid-template-columns: repeat(3, 44px);"></div>
+    </div>
+    <div class="op-symbol">=</div>
+    <div class="matrix-block">
+      <div class="matrix-name">O</div>
+      <div class="matrix-dims">(n=2, d=3)</div>
+      <div class="mgrid" id="gridO" style="grid-template-columns: repeat(3, 44px);"></div>
+    </div>
+  </div>
+
+  <h2><span class="num">02</span>Connect the dots — click any O cell</h2>
+  <p>Every output is a <b>row of X</b> meeting a <b>column of W</b>. Click a cell in <code>O</code> below and watch which row/column actually produced it.</p>
+
+  <div class="matrices">
+    <div class="matrix-block">
+      <div class="matrix-name">X</div>
+      <div class="mgrid" id="gridX2" style="grid-template-columns: repeat(3, 44px);"></div>
+    </div>
+    <div class="op-symbol">×</div>
+    <div class="matrix-block">
+      <div class="matrix-name">W</div>
+      <div class="mgrid" id="gridW2" style="grid-template-columns: repeat(3, 44px);"></div>
+    </div>
+    <div class="op-symbol">=</div>
+    <div class="matrix-block">
+      <div class="matrix-name">O</div>
+      <div class="mgrid" id="gridO2" style="grid-template-columns: repeat(3, 44px);"></div>
+    </div>
+  </div>
+  <div class="formula-strip" id="formulaStrip">click an O cell above ↑</div>
+  <p class="hint">try o₁₁ first, then o₂₃ — notice x-row 1 never touches w-column 3's partner unless you pick that cell</p>
+
+  <h2><span class="num">03</span>Counting the FLOPs</h2>
+  <p>Each output cell needs <b>d</b> multiplications and <b>d−1</b> additions — call it <b>2d</b>, we drop the −1, it doesn't matter at any real scale. There are <b>n·d</b> output cells total.</p>
+  <div class="derivation">
+    <div class="step">flops per output cell  =  2d  =  2 × 3  =  6</div>
+    <div class="step">number of output cells  =  n × d  =  2 × 3  =  6</div>
+    <div class="step">total flops  =  2d × nd  =  <b>2nd²</b>  =  2 × 2 × 9  =  <span class="result">36 FLOPs</span></div>
+  </div>
+
+  <h2><span class="num">04</span>Counting the bytes — this is the part that wasn't clicking</h2>
+  <p>The confusion last time was this: X and W elements get <i>used</i> many times each (once per output that needs them), but they only need to be <b>fetched from HBM once</b> — a decent kernel keeps the on-chip copy around and reuses it instead of re-fetching. So "bytes moved" counts <b>distinct elements</b>, not <b>uses</b>.</p>
+
+  <p>Hover-equivalent: each cell below is tagged with how many outputs it feeds into — that's the reuse count, and it's exactly why we only charge one HBM trip per element.</p>
+
+  <div class="matrices">
+    <div class="matrix-block">
+      <div class="matrix-name">X <span class="pen-red">— read once each</span></div>
+      <div class="mgrid" id="gridX3" style="grid-template-columns: repeat(3, 44px);"></div>
+    </div>
+    <div class="matrix-block">
+      <div class="matrix-name">W <span class="pen-blue">— read once each</span></div>
+      <div class="mgrid" id="gridW3" style="grid-template-columns: repeat(3, 44px);"></div>
+    </div>
+    <div class="matrix-block">
+      <div class="matrix-name">O <span class="pen-green">— written once each</span></div>
+      <div class="mgrid" id="gridO3" style="grid-template-columns: repeat(3, 44px);"></div>
+    </div>
+  </div>
+  <p class="hint">the little red numbers = how many output cells reuse that element on-chip, before it's evicted</p>
+
+  <div class="derivation">
+    <div class="step">elements of X  =  n·d  =  2×3  =  6   <span class="step">(each reused d=3 times, fetched once)</span></div>
+    <div class="step">elements of W  =  d·d  =  3×3  =  9   <span class="step">(each reused n=2 times, fetched once)</span></div>
+    <div class="step">elements of O  =  n·d  =  2×3  =  6   <span class="step">(written once, never re-read here)</span></div>
+    <div class="step">total elements moved  =  2nd + d²  =  12 + 9  =  21</div>
+    <div class="step">bytes (fp16, p=2 bytes)  =  p(2nd + d²)  =  2 × 21  =  <span class="result">42 bytes</span></div>
+  </div>
+
+  <div class="sticky">the min. bytes formula assumes the kernel is smart about reuse — a lazy kernel that re-fetches on every use would move way more than 42 bytes here</div>
+
+  <h2><span class="num">05</span>Arithmetic intensity — FLOPs per byte</h2>
+  <p>Divide what you just computed: <b>36 FLOPs / 42 bytes ≈ 0.86 FLOPs per byte.</b> That single number tells you whether the GPU's math units or its memory bus is the bottleneck for this exact operation.</p>
+
+  <div class="derivation">
+    <div class="step">AI  =  FLOPs / bytes  =  2nd² / [ p(2nd + d²) ]</div>
+    <div class="step">AI  =  36 / 42  =  <span class="result">≈ 0.86 FLOPs/byte</span></div>
+  </div>
+
+  <p>Play with n below (d and precision fixed) and watch that ratio move — this is the whole "batching helps throughput" argument from earlier, made concrete.</p>
+
+  <div class="intensity-lab">
+    <div class="lab-row">
+      <div class="lab-field">
+        <label>d (hidden dim)</label>
+        <select id="dSelect">
+          <option value="3">3 — our example</option>
+          <option value="4096" selected>4096 — realistic transformer</option>
+        </select>
+      </div>
+      <div class="lab-field">
+        <label>n (batch × seq tokens): <span id="nVal">1</span></label>
+        <input type="range" id="nSlider" min="0" max="300" value="0">
+      </div>
+    </div>
+    <div class="lab-readout">
+      <div class="k">FLOPs</div><div class="v" id="flopsVal">—</div>
+      <div class="k">bytes</div><div class="v" id="bytesVal">—</div>
+      <div class="k">intensity</div><div class="v" id="aiVal">—</div>
+      <div class="k">regime</div><div class="v" id="regimeVal">—</div>
+    </div>
+    <div class="roofline">
+      <div class="zone-label zl-mem">memory-bound</div>
+      <div class="zone-label zl-comp">compute-bound</div>
+      <div class="marker" id="marker" style="left: 4%;" data-label="you"></div>
+    </div>
+    <p class="lab-note">n=1 (decoding one token) sits deep in memory-bound territory — you pay for the whole weight matrix to produce almost no math. Push n up (bigger batch, longer prefill) and intensity climbs toward its ceiling of d/p, because the same loaded weight tile gets reused across more rows before eviction.</p>
+  </div>
+
+  <footer>fp16 assumed throughout (p = 2 bytes) · numbers rounded for the notebook example</footer>
+</div>
+
+<script>
+  const X = [[2,1,3],[0,4,1]];
+  const W = [[1,0,2],[3,1,0],[2,2,1]];
+  const O = [[11,7,7],[14,6,1]];
+
+  function buildGrid(id, data, cellClass, badgeFn){
+    const el = document.getElementById(id);
+    el.innerHTML = '';
+    data.forEach((row, i) => row.forEach((val, j) => {
+      const c = document.createElement('div');
+      c.className = 'cell ' + (cellClass||'');
+      c.textContent = val;
+      c.dataset.row = i; c.dataset.col = j;
+      if(badgeFn){
+        const b = document.createElement('div');
+        b.className = 'badge';
+        b.textContent = badgeFn(i,j);
+        c.appendChild(b);
+      }
+      el.appendChild(c);
+    }));
+  }
+
+  // section 1 — plain display
+  buildGrid('gridX', X);
+  buildGrid('gridW', W);
+  buildGrid('gridO', O);
+
+  // section 2 — interactive connect-the-dots
+  buildGrid('gridX2', X);
+  buildGrid('gridW2', W);
+  buildGrid('gridO2', O, 'o-cell');
+
+  document.getElementById('gridO2').addEventListener('click', (e) => {
+    const cell = e.target.closest('.cell');
+    if(!cell) return;
+    const i = +cell.dataset.row, j = +cell.dataset.col;
+
+    document.querySelectorAll('#gridX2 .cell').forEach(c => c.classList.remove('x-hl'));
+    document.querySelectorAll('#gridW2 .cell').forEach(c => c.classList.remove('w-hl'));
+    document.querySelectorAll('#gridO2 .cell').forEach(c => c.classList.remove('o-hl'));
+
+    document.querySelectorAll(`#gridX2 .cell[data-row="${i}"]`).forEach(c => c.classList.add('x-hl'));
+    document.querySelectorAll(`#gridW2 .cell[data-col="${j}"]`).forEach(c => c.classList.add('w-hl'));
+    cell.classList.add('o-hl');
+
+    const xrow = X[i], wcol = W.map(r => r[j]);
+    const terms = xrow.map((v,k) => `${v}×${wcol[k]}`).join(' + ');
+    const sum = xrow.reduce((s,v,k) => s + v*wcol[k], 0);
+    document.getElementById('formulaStrip').textContent =
+      `o${i+1}${j+1} = ${terms} = ${sum}`;
+  });
+
+  // section 4 — reuse badges
+  buildGrid('gridX3', X, '', (i,j) => W[0].length); // reused once per column of W = d times
+  buildGrid('gridW3', W, '', (i,j) => X.length);     // reused once per row of X = n times
+  buildGrid('gridO3', O, '', (i,j) => 1);
+
+  // section 5 — intensity lab
+  const dSelect = document.getElementById('dSelect');
+  const nSlider = document.getElementById('nSlider');
+  const nVal = document.getElementById('nVal');
+  const flopsVal = document.getElementById('flopsVal');
+  const bytesVal = document.getElementById('bytesVal');
+  const aiVal = document.getElementById('aiVal');
+  const regimeVal = document.getElementById('regimeVal');
+  const marker = document.getElementById('marker');
+  const p = 2;
+
+  function nFromSlider(){
+    // exponential mapping so small n is easy to select, up to a few thousand
+    const t = (+nSlider.value) / 300;
+    return Math.max(1, Math.round(Math.pow(10, t * 3.5)));
+  }
+
+  function fmt(x){
+    if(x >= 1e9) return (x/1e9).toFixed(2)+'G';
+    if(x >= 1e6) return (x/1e6).toFixed(2)+'M';
+    if(x >= 1e3) return (x/1e3).toFixed(2)+'K';
+    return x.toFixed(2);
+  }
+
+  function updateLab(){
+    const d = +dSelect.value;
+    const n = nFromSlider();
+    nVal.textContent = n;
+
+    const flops = 2*n*d*d;
+    const bytes = p*(2*n*d + d*d);
+    const ai = flops/bytes;
+    const ceiling = d/p;
+
+    flopsVal.textContent = fmt(flops);
+    bytesVal.textContent = fmt(bytes) + 'B';
+    aiVal.textContent = ai.toFixed(2) + ' F/B';
+    regimeVal.textContent = ai < ceiling*0.5 ? 'memory-bound' : (ai < ceiling*0.9 ? 'transitioning' : 'near ceiling');
+
+    const pct = Math.min(98, Math.max(2, (ai/ceiling)*90));
+    marker.style.left = pct + '%';
+    marker.setAttribute('data-label', 'n=' + n);
+  }
+
+  dSelect.addEventListener('change', updateLab);
+  nSlider.addEventListener('input', updateLab);
+  updateLab();
+</script>
+</body>
+</html>

@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>notes/roofline-decode.md</title>
+<style>
+  :root{
+    --bg: #0b0e14;
+    --surface: #11151d;
+    --surface-2: #161b26;
+    --line: #232936;
+    --text: #e6e8eb;
+    --text-dim: #8b93a1;
+    --mem: #5ec8ff;      /* memory / bandwidth accent */
+    --compute: #ffb454;  /* compute accent */
+    --mono: "IBM Plex Mono", "SF Mono", "Fira Code", ui-monospace, Menlo, Consolas, monospace;
+    --serif: "Source Serif 4", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--serif);
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---- top bar, terminal-file affectation ---- */
+  .topbar{
+    border-bottom:1px solid var(--line);
+    background:var(--surface);
+    padding:10px 20px;
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--text-dim);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    position:sticky;
+    top:0;
+    z-index:20;
+  }
+  .topbar .dots{display:flex;gap:6px;}
+  .topbar .dots span{width:9px;height:9px;border-radius:50%;display:inline-block;background:#2a3040;}
+  .topbar .path::before{content:"~/notes/";color:#4a5164;}
+  .topbar .path{color:var(--text);}
+
+  main{max-width:760px;margin:0 auto;padding:0 24px 120px;}
+
+  /* ---- hero ---- */
+  .hero{padding:64px 0 40px;border-bottom:1px solid var(--line);}
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:18px;
+  }
+  .eyebrow .tag{color:var(--mem);}
+  .eyebrow .tag2{color:var(--compute);}
+  .eyebrow::before{content:"";width:6px;height:6px;background:var(--mem);border-radius:50%;box-shadow:0 0 10px var(--mem);}
+
+  h1{
+    font-family:var(--mono);
+    font-size:clamp(28px,4.4vw,42px);
+    line-height:1.15;
+    margin:0 0 18px;
+    font-weight:600;
+    letter-spacing:-0.01em;
+  }
+  h1 .accent{color:var(--mem);}
+  .dek{
+    font-size:18px;
+    color:var(--text-dim);
+    max-width:58ch;
+    margin:0;
+  }
+  .dek strong{color:var(--text);font-weight:600;}
+
+  /* ---- article typography ---- */
+  article h2{
+    font-family:var(--mono);
+    font-size:14px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    margin:64px 0 6px;
+    padding-bottom:12px;
+    border-bottom:1px solid var(--line);
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+  article h2 .num{color:#4a5164;font-size:13px;}
+  article h3{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:20px;
+    color:var(--text);
+    margin:28px 0 10px;
+  }
+  article p{font-size:17px;margin:16px 0;color:#d3d6db;}
+  article p.lede{font-size:18.5px;color:var(--text);}
+  strong{color:var(--text);}
+  em.term{font-style:normal;color:var(--mem);border-bottom:1px dotted rgba(94,200,255,.4);}
+  em.term.c{color:var(--compute);border-bottom:1px dotted rgba(255,180,84,.4);}
+
+  ul, ol{padding-left:22px;color:#d3d6db;font-size:16.5px;}
+  li{margin:8px 0;}
+
+  code{
+    font-family:var(--mono);
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    padding:1px 6px;
+    border-radius:4px;
+    font-size:0.88em;
+    color:#c9e8ff;
+  }
+
+  /* ---- callouts ---- */
+  .callout{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-left:3px solid var(--mem);
+    border-radius:6px;
+    padding:18px 20px;
+    margin:24px 0;
+    font-size:15.5px;
+    color:#c7cbd3;
+  }
+  .callout.compute{border-left-color:var(--compute);}
+  .callout .label{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--mem);
+    display:block;
+    margin-bottom:8px;
+  }
+  .callout.compute .label{color:var(--compute);}
+
+  /* ---- worked example block ---- */
+  .worked{
+    font-family:var(--mono);
+    font-size:14px;
+    background:#0d1119;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:20px 22px;
+    margin:22px 0;
+    overflow-x:auto;
+  }
+  .worked .wtitle{color:var(--text-dim);font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px;}
+  .worked .row{display:flex;justify-content:space-between;gap:20px;padding:5px 0;border-bottom:1px dashed #1c2230;color:#aab1bd;}
+  .worked .row:last-child{border-bottom:none;}
+  .worked .row .k{color:#8b93a1;}
+  .worked .row .v{color:var(--text);text-align:right;white-space:nowrap;}
+  .worked .result{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);color:var(--mem);font-size:15px;}
+  .worked .result.c{color:var(--compute);}
+
+  /* ---- comparison table ---- */
+  table{width:100%;border-collapse:collapse;margin:20px 0;font-size:15px;}
+  th{
+    font-family:var(--mono);
+    font-size:11.5px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    text-align:left;
+    color:var(--text-dim);
+    padding:10px 12px;
+    border-bottom:1px solid var(--line);
+  }
+  td{padding:12px;border-bottom:1px solid var(--line);color:#d3d6db;vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  td.tag{font-family:var(--mono);font-size:13px;}
+  .pill{
+    display:inline-block;
+    font-family:var(--mono);
+    font-size:11px;
+    padding:2px 8px;
+    border-radius:20px;
+    border:1px solid;
+  }
+  .pill.mem{color:var(--mem);border-color:rgba(94,200,255,.4);background:rgba(94,200,255,.08);}
+  .pill.comp{color:var(--compute);border-color:rgba(255,180,84,.4);background:rgba(255,180,84,.08);}
+
+  /* ---- signature: interactive roofline ---- */
+  .roofline-wrap{
+    margin:28px 0 8px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:22px 20px 14px;
+  }
+  .roofline-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:10px;}
+  .roofline-head .title{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);}
+  .toggle{
+    display:inline-flex;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:3px;
+    font-family:var(--mono);
+    font-size:12.5px;
+  }
+  .toggle button{
+    border:none;
+    background:transparent;
+    color:var(--text-dim);
+    padding:6px 14px;
+    border-radius:16px;
+    cursor:pointer;
+    font-family:var(--mono);
+    font-size:12.5px;
+    transition:background .2s, color .2s;
+  }
+  .toggle button.active{background:var(--mem);color:#04121c;font-weight:600;}
+  .toggle button.active.compute-active{background:var(--compute);color:#241300;}
+
+  svg{width:100%;height:auto;display:block;}
+  .axis-label{font-family:var(--mono);font-size:11px;fill:#6b7280;}
+  .roof-line{fill:none;stroke:#3a4256;stroke-width:2;}
+  .grid-line{stroke:#1a2030;stroke-width:1;}
+  .region-label{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;}
+  .marker-dot{transition: cx .5s cubic-bezier(.4,0,.2,1), cy .5s cubic-bezier(.4,0,.2,1);}
+  .marker-line{transition: x2 .5s cubic-bezier(.4,0,.2,1), y2 .5s cubic-bezier(.4,0,.2,1);}
+  .roofline-caption{
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--text-dim);
+    padding:14px 4px 10px;
+    min-height:38px;
+  }
+  .roofline-caption b{color:var(--text);}
+  .roofline-caption .hi{color:var(--mem);}
+  .roofline-caption .hi.c{color:var(--compute);}
+
+  /* ---- footer ---- */
+  footer{
+    margin-top:70px;
+    padding-top:24px;
+    border-top:1px solid var(--line);
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:#4a5164;
+    display:flex;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+
+  @media (max-width:600px){
+    .hero{padding:44px 0 30px;}
+    article h2{margin:48px 0 6px;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .marker-dot, .marker-line{transition:none;}
+  }
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="dots"><span></span><span></span><span></span></div>
+    <div class="path">roofline-decode.md</div>
+    <div>read · 6 min</div>
+  </div>
+
+  <main>
+    <div class="hero">
+      <div class="eyebrow"><span class="tag">memory-bound</span>&nbsp;vs&nbsp;<span class="tag2">compute-bound</span></div>
+      <h1>Why decode is <span class="accent">memory-bound</span>,<br>one token at a time</h1>
+      <p class="dek">A walk through the roofline model for LLM inference — <strong>why the GPU's compute units sit idle during decode</strong>, what actually gets moved from HBM every step, and why the fix is to chase the ridge point, not avoid it.</p>
+    </div>
+
+    <article>
+
+      <h2><span class="num">01</span> The two axes</h2>
+      <p class="lede">The roofline model plots what a piece of hardware can actually achieve, as a function of one ratio: how much compute you do per byte you move.</p>
+      <ul>
+        <li><strong>x-axis — arithmetic intensity:</strong> FLOPs performed ÷ bytes moved from memory.</li>
+        <li><strong>y-axis — achievable throughput:</strong> FLOPs per second you actually get.</li>
+      </ul>
+      <p>The chart has two regimes, joined at a corner called the <em class="term">ridge point</em>:</p>
+      <ul>
+        <li><strong>Sloped region (left):</strong> throughput = bandwidth × intensity. You're capped by how fast bytes arrive.</li>
+        <li><strong>Flat region (right):</strong> throughput = peak FLOPs/s. You're capped by how fast the compute units can chew through math.</li>
+      </ul>
+      <p>The ridge point itself is just where those two caps happen to be equal — the intensity at which the hardware's peak bandwidth and peak compute are perfectly balanced.</p>
+
+      <div class="roofline-wrap">
+        <div class="roofline-head">
+          <span class="title">Interactive · where each phase sits on the roofline</span>
+          <div class="toggle">
+            <button id="btn-decode" class="active">Decode</button>
+            <button id="btn-prefill">Prefill</button>
+          </div>
+        </div>
+
+        <svg id="roofSvg" viewBox="0 0 640 320" preserveAspectRatio="xMidYMid meet">
+          <!-- grid -->
+          <line class="grid-line" x1="60" y1="40" x2="60" y2="270"></line>
+          <line class="grid-line" x1="60" y1="270" x2="600" y2="270"></line>
+
+          <!-- region shading -->
+          <polygon points="60,270 240,270 60,80" fill="#5ec8ff" opacity="0.06"></polygon>
+          <polygon points="240,270 600,270 600,60 240,80" fill="#ffb454" opacity="0.05"></polygon>
+
+          <text x="95" y="255" class="region-label" fill="#5ec8ff">memory-bound</text>
+          <text x="430" y="255" class="region-label" fill="#ffb454">compute-bound</text>
+
+          <!-- roofline: sloped part then flat part -->
+          <path class="roof-line" d="M 60 270 L 240 80 L 600 80"></path>
+
+          <!-- ridge point marker -->
+          <line x1="240" y1="80" x2="240" y2="270" stroke="#3a4256" stroke-width="1" stroke-dasharray="3,4"></line>
+          <text x="196" y="288" class="axis-label">ridge point</text>
+
+          <!-- axis labels -->
+          <text x="300" y="308" class="axis-label">arithmetic intensity (FLOPs / byte) →</text>
+          <text x="20" y="160" class="axis-label" transform="rotate(-90 20 160)">throughput (FLOPs/s) →</text>
+
+          <!-- moving marker: line from origin-ish + dot -->
+          <line id="markerLine" class="marker-line" x1="60" y1="270" x2="110" y2="197" stroke="#5ec8ff" stroke-width="2"></line>
+          <circle id="markerDot" class="marker-dot" cx="110" cy="197" r="7" fill="#5ec8ff" stroke="#0b0e14" stroke-width="2"></circle>
+          <text id="markerLabel" x="122" y="192" font-family="IBM Plex Mono, monospace" font-size="12" fill="#5ec8ff">single-token decode</text>
+        </svg>
+
+        <div class="roofline-caption" id="roofCaption">
+          <b>Decode:</b> one token's matvec against the full weights + full KV cache. Intensity is <span class="hi">low</span> — the point sits far left of the ridge, deep in the sloped region. Compute finishes almost instantly and idles while bytes keep arriving.
+        </div>
+      </div>
+
+      <h2><span class="num">02</span> What decode actually transfers</h2>
+      <p class="lede">To produce <strong>one new token</strong>, the GPU has to pull two things out of HBM:</p>
+      <ol>
+        <li>The <em class="term">entire model's weights</em> — every layer, all parameters. Fixed size, regardless of how long the conversation is.</li>
+        <li>The <em class="term">entire KV cache</em> accumulated so far — the keys and values for every previous token, every layer. This one <strong>grows</strong> as the sequence gets longer.</li>
+      </ol>
+      <p>And what does it compute against all that data? A <strong>matrix–vector multiply</strong> — one query vector, for one token. Tiny amount of math, relative to the sheer volume of bytes it took to assemble the inputs.</p>
+
+      <div class="callout">
+        <span class="label">the imbalance</span>
+        Bytes moved: <code>weights + KV cache</code> — large, and growing. FLOPs done: one token's worth of matvecs — small, and roughly constant. Arithmetic intensity is therefore low, which is exactly what places decode on the sloped, memory-bound side of the roofline.
+      </div>
+
+      <h3>Worked example — a 7B model at 4K context</h3>
+      <div class="worked">
+        <div class="wtitle">per-decode-step byte transfer (illustrative, fp16)</div>
+        <div class="row"><span class="k">model weights (7B params × 2 bytes)</span><span class="v">≈ 14 GB</span></div>
+        <div class="row"><span class="k">KV cache @ 4,096 tokens (32 layers, 32 heads, d=128)</span><span class="v">≈ 2 GB</span></div>
+        <div class="row"><span class="k">total bytes to move, this one step</span><span class="v">≈ 16 GB</span></div>
+        <div class="row"><span class="k">HBM bandwidth (e.g. A100-class)</span><span class="v">≈ 2 TB/s</span></div>
+        <div class="result">→ ≈ 8 ms floor just to move the data — and the matvec compute itself takes a small fraction of that. The GPU spends most of the step waiting, not computing.</div>
+      </div>
+      <p>Notice the weight term (14 GB) dwarfs the KV term (2 GB) here — but the KV term is the one that keeps climbing.</p>
+
+      <h2><span class="num">03</span> Why it gets worse with sequence length</h2>
+      <p>The weight transfer is a <strong>flat tax</strong> — same cost whether you're on token 10 or token 10,000. The KV cache transfer is <strong>a slope</strong> — it grows linearly with every token you've already generated, because every previous token's keys and values have to be re-read from HBM on every subsequent step.</p>
+
+      <div class="worked">
+        <div class="wtitle">KV cache size vs. sequence length — same 7B config</div>
+        <div class="row"><span class="k">1,024 tokens</span><span class="v">≈ 0.5 GB</span></div>
+        <div class="row"><span class="k">4,096 tokens</span><span class="v">≈ 2 GB</span></div>
+        <div class="row"><span class="k">32,768 tokens</span><span class="v">≈ 17 GB</span></div>
+        <div class="result">→ past a certain length, the KV cache transfer can rival or exceed the weight transfer — the "flat tax" stops being the dominant cost.</div>
+      </div>
+
+      <p>So as a conversation or document gets longer, each new token doesn't just cost the same fixed weight-load anymore — it also drags an ever-larger cache through the memory bus. That's why <strong>per-token decode latency creeps up</strong> as context grows, even though the compute per token barely changed.</p>
+
+      <h2><span class="num">04</span> The actual goal: climb toward the ridge, don't stay below it</h2>
+      <p class="lede">It's tempting to think "stay under the hardware's limits" is the target. It's the opposite: sitting far below the ridge point means compute capacity you already paid for is going unused.</p>
+
+      <div class="callout compute">
+        <span class="label">the fix</span>
+        Every step you take toward the ridge point — by raising arithmetic intensity — converts idle compute into throughput, <em>for free</em>, without moving more bytes. Below the ridge, more intensity ⇒ proportionally more throughput. At the ridge, both resources are finally busy at once.
+      </div>
+
+      <p>The main lever is <strong>batching</strong>: load the weights from HBM <em>once</em>, then multiply them against many sequences' query vectors at once instead of just one. Same weight-bytes moved, many more FLOPs performed — intensity rises, and the point on the chart slides right, toward the ridge.</p>
+
+      <button id="btn-prefill-inline" style="display:none"></button>
+
+      <table>
+        <tr><th>lever</th><th>what it does</th><th>effect on the chart</th></tr>
+        <tr>
+          <td class="tag">Batching</td>
+          <td>Amortizes one weight load across many sequences' matvecs.</td>
+          <td><span class="pill mem">↑ intensity</span> — slides right toward the ridge</td>
+        </tr>
+        <tr>
+          <td class="tag">GQA / MQA</td>
+          <td>Fewer KV heads ⇒ smaller cache to read per step.</td>
+          <td><span class="pill mem">↓ bytes</span> — same effect, less to move</td>
+        </tr>
+        <tr>
+          <td class="tag">KV cache quantization</td>
+          <td>Store K/V in INT8/FP8 instead of FP16.</td>
+          <td><span class="pill mem">↓ bytes</span> — cache shrinks directly</td>
+        </tr>
+        <tr>
+          <td class="tag">PagedAttention</td>
+          <td>Efficient, non-wasteful KV memory layout.</td>
+          <td><span class="pill mem">↓ waste</span> — more headroom for bigger batches</td>
+        </tr>
+      </table>
+
+      <p>Batching fixes the <em>weight</em> half of the transfer well, since it's shared across the batch. It does <strong>not</strong> shrink the KV cache term — each sequence in the batch still carries its own cache, which is why KV cache size, not weight size, is usually the actual ceiling on how large a batch can get.</p>
+
+      <h2><span class="num">05</span> Decode vs. prefill, side by side</h2>
+      <table>
+        <tr><th></th><th>Prefill</th><th>Decode</th></tr>
+        <tr>
+          <td class="tag">what happens</td>
+          <td>Whole prompt processed in one pass</td>
+          <td>One new token generated per step</td>
+        </tr>
+        <tr>
+          <td class="tag">compute per weight-load</td>
+          <td>Many tokens' matmuls reuse the same loaded weights</td>
+          <td>One token's matvec per weight-load</td>
+        </tr>
+        <tr>
+          <td class="tag">arithmetic intensity</td>
+          <td><span class="pill comp">high</span></td>
+          <td><span class="pill mem">low</span></td>
+        </tr>
+        <tr>
+          <td class="tag">typical regime</td>
+          <td>compute-bound (or close to it)</td>
+          <td>memory-bound — worsens with context length</td>
+        </tr>
+      </table>
+
+      <h2><span class="num">06</span> The takeaway</h2>
+      <p class="lede">Every decode step re-reads the entire model and the entire conversation-so-far from HBM, just to run one small matvec. Bandwidth, not compute, sets the pace — and the compute units spend the step idle, waiting for bytes. As context grows, the KV cache half of that transfer keeps climbing, so the wait gets longer per token. The way out isn't to avoid the hardware's limits — it's to <strong>raise arithmetic intensity until you're using both compute and bandwidth at once</strong>, mainly by batching, with cache-shrinking tricks (GQA/MQA, quantization, PagedAttention) buying more room to batch into.</p>
+
+    </article>
+
+    <footer>
+      <span>roofline model · LLM inference notes</span>
+      <span>compiled from a working conversation</span>
+    </footer>
+  </main>
+
+<script>
+(function(){
+  const btnDecode = document.getElementById('btn-decode');
+  const btnPrefill = document.getElementById('btn-prefill');
+  const dot = document.getElementById('markerDot');
+  const line = document.getElementById('markerLine');
+  const label = document.getElementById('markerLabel');
+  const caption = document.getElementById('roofCaption');
+
+  const states = {
+    decode: {
+      x: 110, y: 197, color: '#5ec8ff', text: 'single-token decode',
+      caption: '<b>Decode:</b> one token\'s matvec against the full weights + full KV cache. Intensity is <span class="hi">low</span> — the point sits far left of the ridge, deep in the sloped region. Compute finishes almost instantly and idles while bytes keep arriving.'
+    },
+    prefill: {
+      x: 340, y: 80, color: '#ffb454', text: 'batched prefill',
+      caption: '<b>Prefill:</b> the whole prompt shares one weight load across many tokens\' matmuls. Intensity is <span class="hi c">high</span> — the point sits at or past the ridge, in the flat region. Compute is now the limiter, bandwidth has slack.'
+    }
+  };
+
+  function applyState(name, btnA, btnB){
+    const s = states[name];
+    dot.setAttribute('cx', s.x);
+    dot.setAttribute('cy', s.y);
+    dot.setAttribute('fill', s.color);
+    line.setAttribute('x2', s.x);
+    line.setAttribute('y2', s.y);
+    line.setAttribute('stroke', s.color);
+    label.setAttribute('x', s.x + 12);
+    label.setAttribute('y', s.y - 5);
+    label.setAttribute('fill', s.color);
+    label.textContent = s.text;
+    caption.innerHTML = s.caption;
+    btnA.classList.add('active');
+    btnA.classList.toggle('compute-active', name === 'prefill');
+    btnB.classList.remove('active','compute-active');
+  }
+
+  btnDecode.addEventListener('click', () => applyState('decode', btnDecode, btnPrefill));
+  btnPrefill.addEventListener('click', () => applyState('prefill', btnPrefill, btnDecode));
+})();
+</script>
+
+</body>
+</html>

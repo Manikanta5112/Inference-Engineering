@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Head Attention, Byte by Byte, Head by Head</title>
+<style>
+  :root{
+    --bg: #12151A;
+    --bg-raised: #181C22;
+    --ink: #ECEEF1;
+    --ink-dim: #9BA3AE;
+    --ink-faint: #656D78;
+    --rule: #2A2F37;
+    --accent: #5EA8A0;      /* teal — the "compute" color */
+    --accent-2: #E8A33D;    /* amber — the "attention head" color */
+    --accent-3: #C97A6B;    /* clay — memory / bytes color */
+    --mono: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
+    --display: 'Space Grotesk', 'Inter', sans-serif;
+    --body: 'Inter', -apple-system, sans-serif;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--body);
+    line-height:1.7;
+    font-size:17px;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  ::selection{background:var(--accent-2); color:#12151A;}
+
+  a{color:var(--accent);}
+
+  .wrap{
+    max-width:760px;
+    margin:0 auto;
+    padding:0 28px;
+  }
+
+  /* ---------- HERO ---------- */
+  header.hero{
+    padding:110px 0 70px;
+    border-bottom:1px solid var(--rule);
+    position:relative;
+    overflow:hidden;
+  }
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:12.5px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--accent-2);
+    margin-bottom:22px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .eyebrow::before{
+    content:"";
+    width:22px;height:1px;
+    background:var(--accent-2);
+    display:inline-block;
+  }
+  h1.title{
+    font-family:var(--display);
+    font-size:clamp(34px, 6vw, 54px);
+    line-height:1.08;
+    letter-spacing:-0.02em;
+    margin:0 0 26px;
+    font-weight:600;
+  }
+  h1.title em{
+    font-style:normal;
+    color:var(--accent);
+  }
+  .dek{
+    font-size:19px;
+    color:var(--ink-dim);
+    max-width:56ch;
+    margin:0 0 34px;
+  }
+  .meta-row{
+    display:flex;
+    gap:22px;
+    flex-wrap:wrap;
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--ink-faint);
+  }
+  .meta-row span{display:flex; align-items:center; gap:7px;}
+  .dot{width:5px;height:5px;border-radius:50%;background:var(--accent-3);display:inline-block;}
+
+  /* ---------- ARTICLE BODY ---------- */
+  main{padding:64px 0 40px;}
+
+  section{margin-bottom:74px;}
+
+  .sec-label{
+    font-family:var(--mono);
+    font-size:12.5px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    margin-bottom:14px;
+  }
+
+  h2{
+    font-family:var(--display);
+    font-size:30px;
+    font-weight:600;
+    letter-spacing:-0.01em;
+    margin:0 0 20px;
+    color:var(--ink);
+  }
+  h3{
+    font-family:var(--display);
+    font-size:21px;
+    font-weight:600;
+    margin:34px 0 14px;
+    color:var(--ink);
+  }
+  p{margin:0 0 18px; color:#D6D9DD;}
+  p.lede{font-size:18.5px; color:var(--ink);}
+  strong{color:var(--ink); font-weight:600;}
+  .accent{color:var(--accent);}
+  .accent2{color:var(--accent-2);}
+  .accent3{color:var(--accent-3);}
+
+  ul, ol{margin:0 0 18px; padding-left:22px; color:#D6D9DD;}
+  li{margin-bottom:8px;}
+
+  code{
+    font-family:var(--mono);
+    background:var(--bg-raised);
+    border:1px solid var(--rule);
+    padding:1px 6px;
+    border-radius:4px;
+    font-size:0.88em;
+    color:var(--accent-2);
+  }
+
+  pre{
+    font-family:var(--mono);
+    background:var(--bg-raised);
+    border:1px solid var(--rule);
+    border-radius:10px;
+    padding:20px 22px;
+    overflow-x:auto;
+    font-size:14px;
+    line-height:1.65;
+    color:#C9CDD3;
+    margin:0 0 20px;
+  }
+  pre .c1{color:var(--accent);}
+  pre .c2{color:var(--accent-2);}
+  pre .c3{color:var(--accent-3);}
+  pre .cf{color:var(--ink-faint);}
+
+  /* callout box */
+  .callout{
+    border-left:3px solid var(--accent);
+    background:var(--bg-raised);
+    padding:18px 22px;
+    border-radius:0 8px 8px 0;
+    margin:26px 0;
+    font-size:15.5px;
+  }
+  .callout p{margin:0; color:#C9CDD3;}
+  .callout.warn{border-left-color:var(--accent-3);}
+  .callout .tag{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--accent);
+    display:block;
+    margin-bottom:8px;
+  }
+  .callout.warn .tag{color:var(--accent-3);}
+
+  /* table */
+  table{
+    width:100%;
+    border-collapse:collapse;
+    margin:22px 0;
+    font-size:14.5px;
+  }
+  th, td{
+    text-align:left;
+    padding:11px 14px;
+    border-bottom:1px solid var(--rule);
+  }
+  th{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    font-weight:500;
+  }
+  td{color:#D6D9DD;}
+  td.num{font-family:var(--mono); color:var(--accent-2);}
+
+  hr.divider{
+    border:none;
+    border-top:1px solid var(--rule);
+    margin:60px 0;
+  }
+
+  /* ---------- SVG diagram containers ---------- */
+  .diagram{
+    background:var(--bg-raised);
+    border:1px solid var(--rule);
+    border-radius:12px;
+    padding:26px;
+    margin:26px 0;
+  }
+  .diagram-caption{
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--ink-faint);
+    margin-top:14px;
+    text-align:center;
+  }
+
+  /* ---------- INTERACTIVE HEAD SELECTOR (signature element) ---------- */
+  .lab{
+    background:var(--bg-raised);
+    border:1px solid var(--rule);
+    border-radius:14px;
+    padding:30px;
+    margin:30px 0;
+  }
+  .lab-title{
+    font-family:var(--mono);
+    font-size:12.5px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--accent);
+    margin-bottom:6px;
+  }
+  .lab-sub{
+    font-size:14.5px;
+    color:var(--ink-dim);
+    margin-bottom:22px;
+  }
+  .head-picker{
+    display:flex;
+    flex-wrap:wrap;
+    gap:7px;
+    margin-bottom:22px;
+  }
+  .head-btn{
+    font-family:var(--mono);
+    font-size:12.5px;
+    padding:7px 12px;
+    border-radius:7px;
+    border:1px solid var(--rule);
+    background:transparent;
+    color:var(--ink-faint);
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  .head-btn:hover{border-color:var(--accent); color:var(--ink);}
+  .head-btn.active{
+    background:var(--accent-2);
+    border-color:var(--accent-2);
+    color:#12151A;
+    font-weight:600;
+  }
+  .vector-strip{
+    display:flex;
+    flex-wrap:wrap;
+    gap:3px;
+    margin-bottom:8px;
+  }
+  .cell{
+    width:22px; height:22px;
+    border-radius:3px;
+    background:#232830;
+    transition:all .2s ease;
+  }
+  .cell.active{background:var(--accent-2);}
+  .strip-label{
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--ink-faint);
+    margin-bottom:16px;
+  }
+  .gpu-readout{
+    font-family:var(--mono);
+    font-size:13.5px;
+    color:var(--ink-dim);
+    background:var(--bg);
+    border:1px solid var(--rule);
+    border-radius:8px;
+    padding:14px 16px;
+    margin-top:18px;
+  }
+  .gpu-readout b{color:var(--accent);}
+
+  /* ---------- summary cheat sheet ---------- */
+  .cheat{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    margin:24px 0;
+  }
+  .cheat-item{
+    background:var(--bg-raised);
+    border:1px solid var(--rule);
+    border-radius:10px;
+    padding:16px 18px;
+  }
+  .cheat-item .k{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--accent-2);
+    margin-bottom:6px;
+  }
+  .cheat-item .v{font-size:14px; color:var(--ink-dim);}
+  @media (max-width:560px){.cheat{grid-template-columns:1fr;}}
+
+  footer{
+    border-top:1px solid var(--rule);
+    padding:40px 0 80px;
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--ink-faint);
+  }
+
+  @media (max-width:600px){
+    body{font-size:16px;}
+    header.hero{padding:70px 0 46px;}
+    section{margin-bottom:56px;}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">attention mechanics · from scratch</div>
+    <h1 class="title">Multi-head attention,<br><em>one head at a time</em></h1>
+    <p class="dek">A single attention head is one similarity space. Language needs many at once — syntax, coreference, position, topic. Here's the arithmetic, the split across heads, and the split across GPUs, worked through with real numbers.</p>
+    <div class="meta-row">
+      <span><span class="dot"></span>~14 min read</span>
+      <span><span class="dot"></span>worked example: Llama‑3‑8B, H=32, D=128</span>
+      <span><span class="dot"></span>no hand-waving</span>
+    </div>
+  </div>
+</header>
+
+<main>
+<div class="wrap">
+
+  <!-- ============ SECTION 1 ============ -->
+  <section>
+    <div class="sec-label">01 — the job attention does</div>
+    <h2>Every token needs to borrow context from every other token</h2>
+    <p class="lede">Attention's job, in one sentence: for every token, build a new representation that's a weighted blend of every token's information — including its own — where the weights say "how relevant is token j to understanding token i right now."</p>
+    <p>Take a 3‑token sentence, "The cat sat," each token embedded as a 4‑dimensional vector (real models use d=4096 or more — we're using 4 so every number is checkable by hand).</p>
+    <pre>x1 = [1, 0, 1, 0]   <span class="cf">// "The"</span>
+x2 = [0, 1, 0, 1]   <span class="cf">// "cat"</span>
+x3 = [1, 1, 0, 0]   <span class="cf">// "sat"</span>
+
+X = stack(x1, x2, x3)   <span class="cf">// shape (N=3, d=4)</span></pre>
+    <p>Everything from here is one question, asked three ways: <strong>what am I looking for, what do I contain, and what do I actually offer if picked?</strong> Those three questions are Q, K, and V.</p>
+  </section>
+
+  <!-- ============ SECTION 2 — SINGLE HEAD ============ -->
+  <section id="single-head">
+    <div class="sec-label">02 — single-head attention, worked in full</div>
+    <h2>Q, K, V — and the four steps between them</h2>
+
+    <h3>Step 1 — project</h3>
+    <p>Multiply X by three learned weight matrices, each shape d×d = 4×4:</p>
+    <pre>Q = X · Wq   <span class="cf">shape (3,4)   "what am I looking for?"</span>
+K = X · Wk   <span class="cf">shape (3,4)   "what do I contain?"</span>
+V = X · Wv   <span class="cf">shape (3,4)   "what do I actually offer?"</span></pre>
+
+    <h3>Step 2 — score every token against every other: Q·K<sup>T</sup></h3>
+    <p>Dot Q[i] against K[j] for every pair — one matmul does all 9 pairs at once:</p>
+    <div class="diagram">
+      <svg viewBox="0 0 620 200" width="100%" style="overflow:visible">
+        <style>
+          .lbl{font-family:'IBM Plex Mono',monospace; font-size:12px; fill:#9BA3AE;}
+          .hdr{font-family:'IBM Plex Mono',monospace; font-size:11px; fill:#656D78;}
+          .num{font-family:'IBM Plex Mono',monospace; font-size:13px; fill:#ECEEF1;}
+        </style>
+        <text x="10" y="24" class="hdr">SCORES = Q · Kᵀ</text>
+        <text x="70" y="55" class="hdr">The</text>
+        <text x="150" y="55" class="hdr">cat</text>
+        <text x="230" y="55" class="hdr">sat</text>
+        <text x="10" y="90" class="hdr">The</text>
+        <text x="10" y="130" class="hdr">cat</text>
+        <text x="10" y="170" class="hdr">sat</text>
+
+        <rect x="45" y="70" width="60" height="34" rx="4" fill="#5EA8A0" opacity="0.85"/>
+        <text x="60" y="92" class="num">2.1</text>
+        <rect x="125" y="70" width="60" height="34" rx="4" fill="#232830"/>
+        <text x="145" y="92" class="num">0.3</text>
+        <rect x="205" y="70" width="60" height="34" rx="4" fill="#2E353F"/>
+        <text x="222" y="92" class="num">1.0</text>
+
+        <rect x="45" y="110" width="60" height="34" rx="4" fill="#232830"/>
+        <text x="60" y="132" class="num">0.4</text>
+        <rect x="125" y="110" width="60" height="34" rx="4" fill="#5EA8A0" opacity="0.85"/>
+        <text x="140" y="132" class="num">2.5</text>
+        <rect x="205" y="110" width="60" height="34" rx="4" fill="#2E353F"/>
+        <text x="222" y="132" class="num">0.7</text>
+
+        <rect x="45" y="150" width="60" height="34" rx="4" fill="#2E353F"/>
+        <text x="60" y="172" class="num">1.2</text>
+        <rect x="125" y="150" width="60" height="34" rx="4" fill="#2E353F"/>
+        <text x="140" y="172" class="num">0.9</text>
+        <rect x="205" y="150" width="60" height="34" rx="4" fill="#5EA8A0" opacity="0.85"/>
+        <text x="222" y="172" class="num">1.8</text>
+
+        <text x="330" y="90" class="lbl">← row 1: "The" vs everyone.</text>
+        <text x="330" y="112" class="lbl">Diagonal (teal) = token vs itself,</text>
+        <text x="330" y="134" class="lbl">usually the strongest score.</text>
+      </svg>
+      <div class="diagram-caption">Q·Kᵀ → shape (N,N) = (3,3). One score per token pair.</div>
+    </div>
+
+    <h3>Step 3 — softmax each row</h3>
+    <p>Turn row 1's raw scores <code>[2.1, 0.3, 1.0]</code> into weights that sum to 1:</p>
+    <pre>softmax(row 1) → [<span class="c2">0.55</span>, <span class="cf">0.10</span>, <span class="c3">0.35</span>]</pre>
+    <p>Reading this: to build the new representation for "The," pull <strong class="accent2">55%</strong> from itself, <strong>10%</strong> from "cat," <strong class="accent3">35%</strong> from "sat."</p>
+
+    <h3>Step 4 — weighted sum of V</h3>
+    <pre>Output[1] = 0.55·V1 + 0.10·V2 + 0.35·V3</pre>
+    <p>Repeat for all 3 rows → final output shape (3,4), same shape as the input, but now every token carries a blend of context.</p>
+
+    <div class="callout">
+      <span class="tag">the whole pipeline in one line</span>
+      <p><code>Output = softmax(Q · Kᵀ) · V</code> — projection, score, normalize, blend. Multi-head does not change this pipeline. It runs it more than once, on smaller slices, in parallel.</p>
+    </div>
+  </section>
+
+  <!-- ============ SECTION 3 — WHY MULTI HEAD ============ -->
+  <section>
+    <div class="sec-label">03 — the limit of one head</div>
+    <h2>One head, one similarity space</h2>
+    <p>With a single head, the model has exactly one 4‑dimensional space to decide "how relevant is token j to token i." But language carries many independent kinds of relationships at once between the same two tokens — <em>is this the subject of that verb, does this pronoun refer back to that noun, are these two words on the same topic, are they simply near each other</em> — and one similarity score per pair can't represent all of those simultaneously without them interfering with each other.</p>
+    <p>The fix isn't a bigger single head. It's <strong>several smaller heads running side by side</strong>, each free to specialize in a different kind of relationship.</p>
+  </section>
+
+  <!-- ============ SECTION 4 — MULTI HEAD MECHANICS ============ -->
+  <section id="multi-head">
+    <div class="sec-label">04 — multi-head attention, mechanically</div>
+    <h2>Same pipeline, run H times on smaller slices</h2>
+    <p>Split the model dimension <code>d</code> into <code>H</code> heads, each of size <code>D = d / H</code>. The constraint is simple: the H slices have to add back up to d.</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 640 230" width="100%" style="overflow:visible">
+        <style>
+          .t{font-family:'IBM Plex Mono',monospace; font-size:12px; fill:#9BA3AE;}
+          .t2{font-family:'IBM Plex Mono',monospace; font-size:11.5px; fill:#12151A; font-weight:600;}
+          .th{font-family:'IBM Plex Mono',monospace; font-size:11px; fill:#656D78;}
+        </style>
+        <text x="0" y="20" class="t">Full vector, d = 4096:</text>
+        <rect x="0" y="30" width="620" height="26" rx="4" fill="#232830" stroke="#2A2F37"/>
+        <text x="10" y="47" class="t">[ x1, x2, x3, ... , x4096 ]</text>
+
+        <text x="0" y="88" class="t">Split into H = 32 heads, D = 128 each:</text>
+
+        <rect x="0" y="100" width="132" height="30" rx="4" fill="#E8A33D"/>
+        <text x="10" y="120" class="t2">head 1  [x1..x128]</text>
+
+        <rect x="140" y="100" width="132" height="30" rx="4" fill="#5EA8A0"/>
+        <text x="150" y="120" class="t2">head 2  [x129..256]</text>
+
+        <rect x="280" y="100" width="132" height="30" rx="4" fill="#C97A6B"/>
+        <text x="290" y="120" class="t2">head 3  [x257..384]</text>
+
+        <rect x="420" y="100" width="60" height="30" rx="4" fill="#3A4048"/>
+        <text x="432" y="120" class="th" fill="#ECEEF1">···</text>
+
+        <rect x="490" y="100" width="130" height="30" rx="4" fill="#7A6BC9"/>
+        <text x="498" y="120" class="t2">head 32 [x3969..4096]</text>
+
+        <text x="0" y="165" class="th">Each head runs the identical pipeline, independently, on its own 128-dim slice:</text>
+        <text x="0" y="188" class="t" fill="#ECEEF1">softmax( Q_h · K_hᵀ ) · V_h  →  output_h,  shape (N, 128)</text>
+        <text x="0" y="212" class="th">Then: concat(output_1 ... output_32) → (N, 4096)  →  · Wo  →  final output</text>
+      </svg>
+      <div class="diagram-caption">D = d / H is just how you carve the vector before running attention H times.</div>
+    </div>
+
+    <p>Nothing about the math changes per head — it's the identical <code>softmax(Q·Kᵀ)·V</code> from Section 2, just on a 128‑wide slice instead of a 4096‑wide one. What differs is what each head <em>learns</em> to notice, because each has its own Wq/Wk/Wv slice and therefore its own gradient signal during training.</p>
+
+    <h3>Try it — pick a head</h3>
+    <p>This is the actual Llama‑3‑8B split: d=4096 sliced into 32 heads of 128 each. Click a head to see which 128 of the 4096 dimensions it owns.</p>
+
+    <div class="lab">
+      <div class="lab-title">interactive · head slice explorer</div>
+      <div class="lab-sub">d = 4096 &nbsp;·&nbsp; H = 32 &nbsp;·&nbsp; D = d/H = 128</div>
+      <div class="head-picker" id="headPicker"></div>
+      <div class="strip-label" id="stripLabel">head 1 owns dimensions x1 – x128</div>
+      <div class="vector-strip" id="vectorStrip"></div>
+      <div class="gpu-readout" id="gpuReadout"></div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION 5 — GPU SPLIT ============ -->
+  <section id="gpu-split">
+    <div class="sec-label">05 — where the GPUs come in</div>
+    <h2>Does all of this run on one GPU?</h2>
+    <p>Depends on the model. If the weights, KV cache, and activations fit in one GPU's memory, everything above — every head, every layer — runs on that single chip. That's the right mental model while learning the mechanics. But past a certain model size, or when throughput matters, the work gets split across GPUs. Three splits show up in practice, and only one of them is really about attention heads.</p>
+
+    <h3>Tensor parallelism — splits inside one attention layer</h3>
+    <p>This is the direct payoff of head-splitting. Because each head computes independently — it doesn't need any other head's numbers until the final concat — you can physically place different heads on different GPUs.</p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 640 210" width="100%" style="overflow:visible">
+        <style>
+          .g{font-family:'IBM Plex Mono',monospace; font-size:12px; fill:#ECEEF1;}
+          .gs{font-family:'IBM Plex Mono',monospace; font-size:11px; fill:#9BA3AE;}
+        </style>
+        <rect x="0" y="10" width="145" height="150" rx="10" fill="#181C22" stroke="#5EA8A0" stroke-width="1.5"/>
+        <text x="16" y="36" class="g" fill="#5EA8A0">GPU 0</text>
+        <text x="16" y="58" class="gs">heads 1–8</text>
+        <text x="16" y="78" class="gs">Wq/Wk/Wv/Wo</text>
+        <text x="16" y="94" class="gs">slice</text>
+        <text x="16" y="130" class="gs">holds 1/4</text>
+        <text x="16" y="146" class="gs">of KV cache</text>
+
+        <rect x="165" y="10" width="145" height="150" rx="10" fill="#181C22" stroke="#E8A33D" stroke-width="1.5"/>
+        <text x="181" y="36" class="g" fill="#E8A33D">GPU 1</text>
+        <text x="181" y="58" class="gs">heads 9–16</text>
+
+        <rect x="330" y="10" width="145" height="150" rx="10" fill="#181C22" stroke="#C97A6B" stroke-width="1.5"/>
+        <text x="346" y="36" class="g" fill="#C97A6B">GPU 2</text>
+        <text x="346" y="58" class="gs">heads 17–24</text>
+
+        <rect x="495" y="10" width="145" height="150" rx="10" fill="#181C22" stroke="#7A6BC9" stroke-width="1.5"/>
+        <text x="511" y="36" class="g" fill="#7A6BC9">GPU 3</text>
+        <text x="511" y="58" class="gs">heads 25–32</text>
+
+        <text x="0" y="190" class="gs">↓ all 4 GPUs briefly sync (all-reduce) to concat + apply Wo, then move to next layer</text>
+      </svg>
+      <div class="diagram-caption">4-way tensor parallelism on Llama-3-8B: 32 heads ÷ 4 GPUs = 8 heads per GPU.</div>
+    </div>
+
+    <p>Each GPU only ever needs its own heads' Q/K/V slices and its own 1/4 of the KV cache. The only cross-GPU communication is a brief sync at the end of the attention block, to concatenate the per-GPU outputs before the shared <code>Wo</code> projection. This is exactly why multi-head attention is convenient hardware-wise — the head boundary is a natural place to cut, since heads don't depend on each other mid-computation.</p>
+
+    <h3>Pipeline parallelism — splits across layers, not heads</h3>
+    <p>Different GPUs hold different transformer <em>layers</em> — GPU 0 holds layers 1–16, GPU 1 holds layers 17–32 — and activations get handed off GPU‑to‑GPU as data flows through the model's depth. Within any one GPU's layers, all heads for that layer are computed together, in full, on that one chip.</p>
+
+    <h3>Data / batch parallelism — splits across requests, not the model</h3>
+    <p>Every GPU (or GPU group) runs a full copy of the model and handles different users independently. This is the "batching" lever from the roofline chart — more requests sharing a weight-load — extended across separate machines so many users can be served concurrently.</p>
+
+    <div class="callout warn">
+      <span class="tag">the distinction that matters</span>
+      <p>Tensor parallelism is the only one of the three that touches the head-splitting you just learned. Pipeline parallelism cuts by depth (layers). Data parallelism cuts by request (batch). All three can run simultaneously in a real cluster — a 70B+ model commonly uses all three at once.</p>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ============ SECTION 6 — RECAP ============ -->
+  <section>
+    <div class="sec-label">06 — carry this forward</div>
+    <h2>The five facts worth keeping</h2>
+    <div class="cheat">
+      <div class="cheat-item">
+        <div class="k">01 · the pipeline</div>
+        <div class="v"><code>softmax(Q·Kᵀ)·V</code> is the whole mechanism — single-head or multi-head, it's identical.</div>
+      </div>
+      <div class="cheat-item">
+        <div class="k">02 · D = d / H</div>
+        <div class="v">The H head-slices must sum back to d. Llama‑3‑8B: 4096 = 32 × 128.</div>
+      </div>
+      <div class="cheat-item">
+        <div class="k">03 · why H heads</div>
+        <div class="v">One head = one similarity space. Multiple heads let the model track several relationships between the same two tokens at once.</div>
+      </div>
+      <div class="cheat-item">
+        <div class="k">04 · heads are independent</div>
+        <div class="v">No head needs another head's numbers until the final concat + Wo — which is exactly what makes them splittable.</div>
+      </div>
+      <div class="cheat-item">
+        <div class="k">05 · tensor parallelism</div>
+        <div class="v">Splits heads across GPUs. Different from pipeline parallelism (splits layers) and data parallelism (splits requests).</div>
+      </div>
+      <div class="cheat-item">
+        <div class="k">06 · single GPU is the default</div>
+        <div class="v">Multi-GPU splitting only kicks in once a model's weights + KV cache stop fitting comfortably on one chip.</div>
+      </div>
+    </div>
+  </section>
+
+</div>
+</main>
+
+<footer>
+  <div class="wrap">attention mechanics notes · worked with Llama‑3‑8B numbers (d=4096, H=32, D=128)</div>
+</footer>
+
+<script>
+(function(){
+  const H = 32, D = 128, d = 4096;
+  const colors = ['#E8A33D','#5EA8A0','#C97A6B','#7A6BC9'];
+  const picker = document.getElementById('headPicker');
+  const strip = document.getElementById('vectorStrip');
+  const label = document.getElementById('stripLabel');
+  const readout = document.getElementById('gpuReadout');
+
+  for(let h=1; h<=H; h++){
+    const btn = document.createElement('button');
+    btn.className = 'head-btn' + (h===1 ? ' active' : '');
+    btn.textContent = 'H' + h;
+    btn.dataset.head = h;
+    btn.addEventListener('click', () => selectHead(h));
+    picker.appendChild(btn);
+  }
+
+  // build a compressed strip: 64 cells representing the 4096-dim vector (each cell = 64 dims)
+  const CELLS = 64;
+  const dimsPerCell = d / CELLS; // 64
+  for(let i=0;i<CELLS;i++){
+    const c = document.createElement('div');
+    c.className = 'cell';
+    c.dataset.idx = i;
+    strip.appendChild(c);
+  }
+
+  function selectHead(h){
+    document.querySelectorAll('.head-btn').forEach(b=>{
+      b.classList.toggle('active', parseInt(b.dataset.head)===h);
+    });
+    const start = (h-1)*D + 1;
+    const end = h*D;
+    label.textContent = 'head ' + h + ' owns dimensions x' + start + ' – x' + end;
+
+    const cellStart = Math.floor((start-1)/dimsPerCell);
+    const cellEnd = Math.floor((end-1)/dimsPerCell);
+    document.querySelectorAll('.cell').forEach(c=>{
+      const idx = parseInt(c.dataset.idx);
+      c.classList.toggle('active', idx>=cellStart && idx<=cellEnd);
+    });
+
+    const gpuCount = 4;
+    const headsPerGpu = H / gpuCount;
+    const gpu = Math.floor((h-1)/headsPerGpu);
+    readout.innerHTML = 'on a 4‑GPU tensor-parallel split (' + headsPerGpu + ' heads/GPU) → head ' + h + ' lives on <b>GPU ' + gpu + '</b>, alongside heads ' + (gpu*headsPerGpu+1) + '–' + ((gpu+1)*headsPerGpu) + '.';
+  }
+
+  selectHead(1);
+})();
+</script>
+
+</body>
+</html>

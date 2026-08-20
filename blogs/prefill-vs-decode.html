@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prefill vs Decode — Visually</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0d0f14; --bg-panel:#14161d; --bg-card:#191c25; --line:#2a2e3a; --line-soft:#1e212b;
+    --text:#e6e8ee; --text-dim:#8b90a0; --text-faint:#565b6b;
+    --accent:#e8a355; --teal:#4fd1c5; --violet:#a78bfa; --red:#e0715c; --teal-dim:#2a5a56;
+    --font-d:'Space Grotesk',sans-serif; --font-m:'JetBrains Mono',monospace; --font-b:'Inter',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--font-b);line-height:1.6;}
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px;}
+  header.hero{padding:80px 0 44px;}
+  .eyebrow{font-family:var(--font-m);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--teal);display:flex;align-items:center;gap:10px;margin-bottom:20px;}
+  .eyebrow::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--teal);box-shadow:0 0 10px var(--teal);}
+  h1{font-family:var(--font-d);font-weight:700;font-size:clamp(30px,4.8vw,46px);line-height:1.12;max-width:18ch;}
+  h1 em{font-style:normal;color:var(--accent);}
+  .lede{margin-top:18px;font-size:17px;color:var(--text-dim);max-width:62ch;}
+  section{padding:56px 0;border-top:1px solid var(--line-soft);}
+  .kicker{font-family:var(--font-m);font-size:11.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;}
+  h2{font-family:var(--font-d);font-size:clamp(21px,3vw,28px);font-weight:600;margin-bottom:12px;}
+  p.body{color:var(--text-dim);max-width:64ch;font-size:15.5px;}
+  p.body b{color:var(--text);font-weight:600;}
+  p.body + p.body{margin-top:10px;}
+  .mono{font-family:var(--font-m);}
+
+  /* prompt flow */
+  .prompt-flow{margin:30px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+  .tok{font-family:var(--font-m);font-size:13px;background:var(--bg-card);border:1px solid var(--line);border-radius:6px;padding:8px 12px;}
+  .tok.gen{border-color:var(--accent);color:var(--accent);}
+  .flow-arrow{color:var(--text-faint);font-family:var(--font-m);}
+
+  .stage-row{display:flex;gap:14px;flex-wrap:wrap;margin-top:26px;}
+  .stage-card{flex:1;min-width:260px;background:var(--bg-card);border:1px solid var(--line);border-radius:12px;padding:20px;}
+  .stage-card.prefill{border-color:var(--teal-dim);}
+  .stage-card.decode{border-color:#5a3f2a;}
+  .stage-card .stag{font-family:var(--font-m);font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+  .prefill .stag{color:var(--teal);}
+  .decode .stag{color:var(--accent);}
+  .stage-card h3{font-family:var(--font-d);font-size:19px;margin-bottom:8px;}
+  .stage-card p{font-size:14px;color:var(--text-dim);}
+
+  /* animated demo shared */
+  .demo{margin-top:30px;background:var(--bg-panel);border:1px solid var(--line);border-radius:14px;padding:24px;}
+  .demo-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;}
+  button.run-btn{font-family:var(--font-m);background:var(--accent);color:#1a1206;border:none;padding:9px 18px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;}
+  button.run-btn:hover{background:#f0b46e;}
+  button.run-btn:disabled{opacity:.4;cursor:default;}
+  button.run-btn.teal{background:var(--teal);}
+  button.run-btn.teal:hover{background:#7fe0d6;}
+  .demo-status{font-family:var(--font-m);font-size:12.5px;color:var(--text-dim);min-height:18px;}
+  .demo-status b{color:var(--accent);}
+
+  .lane{position:relative;height:52px;background:var(--bg-card);border:1px solid var(--line);border-radius:8px;margin-bottom:10px;}
+  .lane.active{border-color:var(--teal);box-shadow:0 0 0 1px var(--teal) inset;}
+  .lane-tag{position:absolute;left:8px;top:6px;font-family:var(--font-m);font-size:9.5px;color:var(--text-faint);text-transform:uppercase;}
+  .chip{position:absolute;top:20px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--font-m);font-size:10px;font-weight:700;color:#0a0d12;transition:left .55s cubic-bezier(.4,0,.2,1), width .3s ease;}
+  .chip-w{background:var(--teal);width:34px;}
+  .chip-tok{background:var(--violet);color:#fff;width:30px;}
+  .counters{margin-top:18px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  .counter{background:var(--bg-card);padding:12px 14px;}
+  .counter .cl{font-family:var(--font-m);font-size:9.5px;color:var(--text-faint);text-transform:uppercase;}
+  .counter .cv{font-family:var(--font-d);font-size:20px;font-weight:600;margin-top:3px;}
+
+  /* comparison table */
+  .cmp-table{margin-top:30px;width:100%;border-collapse:collapse;font-family:var(--font-m);font-size:13px;}
+  .cmp-table th,.cmp-table td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line-soft);}
+  .cmp-table th{color:var(--text-faint);font-weight:500;text-transform:uppercase;font-size:10.5px;letter-spacing:.05em;}
+  .cmp-table td.hl-prefill{color:var(--teal);font-weight:700;}
+  .cmp-table td.hl-decode{color:var(--accent);font-weight:700;}
+
+  /* roofline */
+  .roofline{position:relative;height:50px;border-radius:8px;background:linear-gradient(90deg,#3a2c26 0%,#3a2c26 55%,#20342c 55%,#20342c 100%);border:1px solid var(--line-soft);margin-top:22px;}
+  .rl-label{position:absolute;top:6px;font-family:var(--font-m);font-size:11px;color:var(--text-dim);}
+  .rl-mem{left:10px;} .rl-comp{right:10px;}
+  .marker{position:absolute;top:-8px;width:3px;height:66px;transition:left .5s ease;}
+  .marker::after{content:attr(data-label);position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-family:var(--font-m);font-size:10.5px;font-weight:700;white-space:nowrap;}
+  .marker.mk-prefill{background:var(--teal);} .marker.mk-prefill::after{color:var(--teal);}
+  .marker.mk-decode{background:var(--accent);} .marker.mk-decode::after{color:var(--accent);}
+
+  /* batching lab */
+  .lab{margin-top:30px;background:var(--bg-panel);border:1px solid var(--line);border-radius:14px;padding:24px;}
+  .lab-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:16px;}
+  .lab-row label{font-family:var(--font-m);font-size:11px;color:var(--text-faint);text-transform:uppercase;}
+  input[type=range]{width:240px;}
+  .lab-readout{font-family:var(--font-m);font-size:13px;display:grid;grid-template-columns:repeat(4,auto);gap:6px 22px;margin-bottom:14px;}
+  .lab-readout .k{color:var(--text-faint);} .lab-readout .v{color:var(--accent);font-weight:700;}
+
+  footer{padding:44px 0 76px;color:var(--text-faint);font-size:12px;font-family:var(--font-m);text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">The two faces of inference</div>
+    <h1>Prefill reads your prompt <em>all at once</em>. Decode writes the reply <em>one word at a time.</em></h1>
+    <p class="lede">Same model, same weights, two completely different memory-bound stories. Watch what actually happens to the weight matrix in each phase.</p>
+  </header>
+
+  <section id="journey">
+    <div class="kicker">01 — The full journey</div>
+    <h2>One prompt, two phases</h2>
+    <p class="body">Say you type this prompt. The <b>teal</b> tokens all get processed together in one shot (prefill). Then the model starts producing the <b>orange</b> tokens, one at a time, each one depending on everything before it (decode).</p>
+    <div class="prompt-flow">
+      <span class="tok">The</span><span class="tok">capital</span><span class="tok">of</span><span class="tok">France</span><span class="tok">is</span>
+      <span class="flow-arrow">→</span>
+      <span class="tok gen">Paris</span><span class="flow-arrow">→</span>
+      <span class="tok gen">,</span><span class="flow-arrow">→</span>
+      <span class="tok gen">a</span><span class="flow-arrow">→</span>
+      <span class="tok gen">city</span>
+    </div>
+
+    <div class="stage-row">
+      <div class="stage-card prefill">
+        <div class="stag">Prefill</div>
+        <h3>Read the prompt</h3>
+        <p>All 5 input tokens go through the model together, as one batched matmul. This also builds the <b>KV cache</b> — a saved copy of each prompt token's Key/Value vectors, so decode never has to reprocess the prompt.</p>
+      </div>
+      <div class="stage-card decode">
+        <div class="stag">Decode</div>
+        <h3>Write the reply</h3>
+        <p>One new token at a time. Each step only needs to process that single new token — but still needs the <i>entire</i> weight matrix pulled in from HBM to do it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="prefill-demo">
+    <div class="kicker">02 — Watch prefill</div>
+    <h2>One weight fetch, reused across every prompt token</h2>
+    <p class="body">Press run: the weight tile loads from HBM <b>once</b>, then all 5 prompt tokens pass through it while it's still sitting in fast memory. That's high reuse per byte fetched — <b>compute-bound</b>.</p>
+
+    <div class="demo">
+      <div class="demo-head">
+        <button class="run-btn teal" id="runPrefill">▶ Run prefill</button>
+        <div class="demo-status" id="prefillStatus">idle — 5 tokens queued</div>
+      </div>
+      <div class="lane" id="pf-hbm"><div class="lane-tag">HBM</div></div>
+      <div class="lane" id="pf-onchip"><div class="lane-tag">On-chip (L1/registers)</div></div>
+      <div class="counters">
+        <div class="counter"><div class="cl">HBM trips for W</div><div class="cv" id="pfTrips">0</div></div>
+        <div class="counter"><div class="cl">Tokens reusing it</div><div class="cv" id="pfReuse">0</div></div>
+        <div class="counter"><div class="cl">Arithmetic intensity</div><div class="cv" id="pfAI">—</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="decode-demo">
+    <div class="kicker">03 — Watch decode</div>
+    <h2>One weight fetch, per single token, every time</h2>
+    <p class="body">Press run: for <i>each new token</i>, the same weight matrix has to make the full HBM trip again — used once, evicted, fetched again for the next token. That's minimal reuse per byte — <b>memory-bound</b>.</p>
+
+    <div class="demo">
+      <div class="demo-head">
+        <button class="run-btn" id="runDecode">▶ Run 3 decode steps</button>
+        <div class="demo-status" id="decodeStatus">idle</div>
+      </div>
+      <div class="lane" id="dc-hbm"><div class="lane-tag">HBM</div></div>
+      <div class="lane" id="dc-onchip"><div class="lane-tag">On-chip (L1/registers)</div></div>
+      <div class="counters">
+        <div class="counter"><div class="cl">HBM trips for W</div><div class="cv" id="dcTrips">0</div></div>
+        <div class="counter"><div class="cl">Tokens per trip</div><div class="cv" id="dcReuse">1</div></div>
+        <div class="counter"><div class="cl">Arithmetic intensity</div><div class="cv" id="dcAI">—</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="compare">
+    <div class="kicker">04 — Side by side</div>
+    <h2>Same formula, wildly different numbers</h2>
+    <p class="body">Using <span class="mono">d=4096</span>, fp16 (p=2), and the 2nd²/bytes formulas from earlier — prefill batches n=512 prompt tokens, decode processes n=1:</p>
+
+    <table class="cmp-table">
+      <tr><th></th><th>Prefill (n=512)</th><th>Decode (n=1)</th></tr>
+      <tr><td>FLOPs</td><td class="hl-prefill">≈ 17.18 billion</td><td class="hl-decode">≈ 33.6 million</td></tr>
+      <tr><td>Bytes moved</td><td class="hl-prefill">≈ 41.9 million</td><td class="hl-decode">≈ 33.6 million</td></tr>
+      <tr><td>Arithmetic intensity</td><td class="hl-prefill">≈ 410 FLOPs/byte</td><td class="hl-decode">≈ 1 FLOP/byte</td></tr>
+      <tr><td>Regime</td><td class="hl-prefill">compute-bound</td><td class="hl-decode">memory-bound</td></tr>
+    </table>
+
+    <div class="roofline">
+      <div class="rl-label rl-mem">memory-bound</div>
+      <div class="rl-label rl-comp">compute-bound</div>
+      <div class="marker mk-decode" style="left:2%;" data-label="decode n=1"></div>
+      <div class="marker mk-prefill" style="left:92%;" data-label="prefill n=512"></div>
+    </div>
+    <p class="body" style="margin-top:16px;">Ridge point for an H100-class chip (989 TFLOPs ÷ 3.35 TB/s) sits around <b>295 FLOPs/byte</b> — prefill clears it easily, decode isn't remotely close.</p>
+  </section>
+
+  <section id="fix">
+    <div class="kicker">05 — The fix</div>
+    <h2>Batching drags decode toward compute-bound</h2>
+    <p class="body">If you batch multiple users' decode requests together, the matmul's n goes from 1 to the batch size. Same weight tile loaded once, but now reused across every request in the batch. Drag the slider — this is the exact lever inference servers (vLLM, TensorRT-LLM, etc.) pull.</p>
+
+    <div class="lab">
+      <div class="lab-row">
+        <label>Batch size (n): <span id="batchVal">1</span></label>
+        <input type="range" id="batchSlider" min="1" max="256" value="1">
+      </div>
+      <div class="lab-readout">
+        <div class="k">FLOPs</div><div class="v" id="labFlops">—</div>
+        <div class="k">bytes</div><div class="v" id="labBytes">—</div>
+        <div class="k">intensity</div><div class="v" id="labAI">—</div>
+        <div class="k">regime</div><div class="v" id="labRegime">—</div>
+      </div>
+      <div class="roofline">
+        <div class="rl-label rl-mem">memory-bound</div>
+        <div class="rl-label rl-comp">compute-bound</div>
+        <div class="marker mk-decode" id="labMarker" style="left:2%;" data-label="n=1"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>d = 4096, fp16 (p=2 bytes), ridge point modeled on H100-class specs · figures illustrative</footer>
+</div>
+
+<script>
+  function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+  /* ---------- prefill demo ---------- */
+  const pfBtn = document.getElementById('runPrefill');
+  const pfStatus = document.getElementById('prefillStatus');
+  const pfHbm = document.getElementById('pf-hbm');
+  const pfOnchip = document.getElementById('pf-onchip');
+  const pfTrips = document.getElementById('pfTrips');
+  const pfReuse = document.getElementById('pfReuse');
+  const pfAI = document.getElementById('pfAI');
+  const tokenNames = ['The','capital','of','France','is'];
+
+  async function runPrefill(){
+    pfBtn.disabled = true;
+    pfTrips.textContent = '0'; pfReuse.textContent = '0'; pfAI.textContent = '—';
+    pfHbm.innerHTML = '<div class="lane-tag">HBM</div>'; pfOnchip.innerHTML = '<div class="lane-tag">On-chip (L1/registers)</div>';
+
+    const w = document.createElement('div');
+    w.className = 'chip chip-w'; w.textContent = 'W'; w.style.left = '80px';
+    pfHbm.appendChild(w);
+    pfStatus.innerHTML = 'Loading weight tile from HBM…';
+    await wait(500);
+
+    pfHbm.classList.add('active');
+    await wait(300);
+    pfHbm.classList.remove('active');
+    pfOnchip.appendChild(w);
+    requestAnimationFrame(()=>{ w.style.left = '80px'; });
+    pfTrips.textContent = '1';
+    pfStatus.innerHTML = '<b>1 HBM trip</b> — now reusing it for every prompt token…';
+    await wait(500);
+
+    for(let i=0;i<5;i++){
+      const t = document.createElement('div');
+      t.className = 'chip chip-tok'; t.textContent = tokenNames[i].slice(0,4);
+      t.style.left = '6px';
+      pfOnchip.appendChild(t);
+      await wait(80);
+      requestAnimationFrame(()=>{ t.style.left = (80+40) + 'px'; });
+      pfReuse.textContent = String(i+1);
+      pfStatus.innerHTML = `Token "<b>${tokenNames[i]}</b>" reuses the same on-chip weight tile (${i+1}/5)`;
+      await wait(420);
+      t.style.transition = 'opacity .3s ease';
+      t.style.opacity = '0';
+      await wait(200);
+      t.remove();
+    }
+    pfAI.textContent = '≈410 F/B';
+    pfStatus.innerHTML = '<b>Done.</b> 1 trip to HBM served 5 tokens — high reuse, compute-bound.';
+    pfBtn.disabled = false;
+  }
+  pfBtn.addEventListener('click', runPrefill);
+
+  /* ---------- decode demo ---------- */
+  const dcBtn = document.getElementById('runDecode');
+  const dcStatus = document.getElementById('decodeStatus');
+  const dcHbm = document.getElementById('dc-hbm');
+  const dcOnchip = document.getElementById('dc-onchip');
+  const dcTrips = document.getElementById('dcTrips');
+  const dcAI = document.getElementById('dcAI');
+  const genTokens = ['Paris', ',', 'a'];
+
+  async function runDecode(){
+    dcBtn.disabled = true;
+    dcTrips.textContent = '0'; dcAI.textContent = '—';
+    let trips = 0;
+
+    for(let i=0;i<3;i++){
+      dcHbm.innerHTML = '<div class="lane-tag">HBM</div>';
+      dcOnchip.innerHTML = '<div class="lane-tag">On-chip (L1/registers)</div>';
+
+      const w = document.createElement('div');
+      w.className = 'chip chip-w'; w.textContent = 'W'; w.style.left = '80px';
+      dcHbm.appendChild(w);
+      dcStatus.innerHTML = `Generating "<b>${genTokens[i]}</b>" — fetching the <i>entire</i> weight tile again from HBM…`;
+      dcHbm.classList.add('active');
+      await wait(550);
+      dcHbm.classList.remove('active');
+
+      trips++;
+      dcTrips.textContent = String(trips);
+      dcOnchip.appendChild(w);
+      requestAnimationFrame(()=>{ w.style.left = '80px'; });
+      await wait(300);
+
+      const t = document.createElement('div');
+      t.className = 'chip chip-tok'; t.textContent = genTokens[i];
+      t.style.left = '6px';
+      dcOnchip.appendChild(t);
+      await wait(80);
+      requestAnimationFrame(()=>{ t.style.left = '124px'; });
+      dcStatus.innerHTML = `Used once for "<b>${genTokens[i]}</b>", then the whole tile gets evicted.`;
+      await wait(500);
+    }
+    dcAI.textContent = '≈1 F/B';
+    dcStatus.innerHTML = `<b>Done.</b> ${trips} separate HBM trips for ${trips} tokens — almost no reuse, memory-bound.`;
+    dcBtn.disabled = false;
+  }
+  dcBtn.addEventListener('click', runDecode);
+
+  /* ---------- batching lab ---------- */
+  const d = 4096, p = 2, ceiling = d/p, ridge = 295;
+  const batchSlider = document.getElementById('batchSlider');
+  const batchVal = document.getElementById('batchVal');
+  const labFlops = document.getElementById('labFlops');
+  const labBytes = document.getElementById('labBytes');
+  const labAI = document.getElementById('labAI');
+  const labRegime = document.getElementById('labRegime');
+  const labMarker = document.getElementById('labMarker');
+
+  function fmt(x){
+    if(x>=1e9) return (x/1e9).toFixed(2)+'G';
+    if(x>=1e6) return (x/1e6).toFixed(2)+'M';
+    if(x>=1e3) return (x/1e3).toFixed(2)+'K';
+    return x.toFixed(1);
+  }
+
+  function updateLab(){
+    const n = +batchSlider.value;
+    batchVal.textContent = n;
+    const flops = 2*n*d*d;
+    const bytes = p*(2*n*d + d*d);
+    const ai = flops/bytes;
+    labFlops.textContent = fmt(flops);
+    labBytes.textContent = fmt(bytes)+'B';
+    labAI.textContent = ai.toFixed(1)+' F/B';
+    labRegime.textContent = ai < ridge*0.5 ? 'memory-bound' : (ai < ridge*0.95 ? 'improving…' : 'near/at ridge');
+    const pct = Math.min(96, Math.max(2, (ai/ceiling)*96));
+    labMarker.style.left = pct+'%';
+    labMarker.setAttribute('data-label', 'n='+n);
+  }
+  batchSlider.addEventListener('input', updateLab);
+  updateLab();
+</script>
+</body>
+</html>
