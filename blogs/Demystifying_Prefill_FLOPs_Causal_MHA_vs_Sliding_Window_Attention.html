@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Demystifying Attention FLOPs: Standard MHA vs. Sliding Window Attention (SWA)</title>
+  
+  <!-- Fast, safe KaTeX renderer via Cloudflare -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '\\(', right: '\\)', display: false}]});"></script>
+
+  <style>
+    :root {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --primary: #2563eb;
+      --primary-light: #eff6ff;
+      --border-color: #e2e8f0;
+      --badge-bg: #e0f2fe;
+      --badge-text: #0369a1;
+      --code-bg: #f1f5f9;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      line-height: 1.7;
+      color: var(--text-main);
+      background-color: var(--bg-color);
+      margin: 0;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      padding: 48px;
+      border-radius: 16px;
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+      border: 1px solid var(--border-color);
+    }
+
+    h1 {
+      font-size: 2.1rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.25;
+      color: #0f172a;
+      margin-bottom: 12px;
+    }
+
+    .meta {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      margin-bottom: 32px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 16px;
+    }
+
+    h2 {
+      font-size: 1.45rem;
+      font-weight: 700;
+      margin-top: 40px;
+      margin-bottom: 16px;
+      color: #0f172a;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+    }
+
+    h3 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin-top: 24px;
+      margin-bottom: 12px;
+      color: #1e293b;
+    }
+
+    p, li {
+      color: #334155;
+      font-size: 1.05rem;
+    }
+
+    ul, ol {
+      padding-left: 24px;
+      margin-bottom: 20px;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    a {
+      color: var(--primary);
+      text-decoration: underline;
+      font-weight: 500;
+    }
+
+    a:hover {
+      color: #1d4ed8;
+    }
+
+    .callout {
+      background: var(--primary-light);
+      border-left: 4px solid var(--primary);
+      padding: 16px 20px;
+      border-radius: 0 8px 8px 0;
+      margin: 24px 0;
+    }
+
+    .callout p {
+      margin: 0;
+      color: #1e40af;
+      font-weight: 500;
+    }
+
+    .deep-dive {
+      background: #fdfdfd;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 24px 28px;
+      margin-top: 40px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 32px 0;
+      font-size: 0.95rem;
+    }
+
+    th, td {
+      border: 1px solid var(--border-color);
+      padding: 14px 16px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f1f5f9;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      background: var(--badge-bg);
+      color: var(--badge-text);
+    }
+  </style>
+</head>
+<body>
+
+<article class="container">
+  <header>
+    <h1>Understanding Prefill FLOPs: Multi-Head Attention vs. Sliding Window Attention</h1>
+    <div class="meta">
+      <span>LLM Architecture & Deep Learning Systems</span> • <span>Derivation & Analysis</span>
+    </div>
+  </header>
+
+  <p>
+    When scaling Large Language Models (LLMs) to massive context windows, computational complexity becomes the primary bottleneck during prompt ingestion (the prefill phase). In this post, we break down the exact Floating Point Operations (FLOPs) required for standard causal <strong>Multi-Head Attention (MHA)</strong> and <strong>Sliding Window Attention (SWA)</strong> from first principles.
+  </p>
+
+  <h2>1. Mathematical Foundations: The FLOP Count Rule</h2>
+  <p>
+    Let's establish the fundamental arithmetic rule for matrix multiplication:
+  </p>
+  <ul>
+    <li>
+      A single dot product of two vectors of dimension \(d\) requires \(d\) multiplications and \(d - 1\) additions:
+      $$\text{Cost} = d + (d - 1) \approx 2d \text{ FLOPs}$$
+    </li>
+    <li>
+      Multiplying a matrix \(A \in \mathbb{R}^{M \times K}\) with a matrix \(B \in \mathbb{R}^{K \times N}\) produces an \(M \times N\) matrix where every element requires a length-\(K\) dot product:
+      $$\text{Total FLOPs} = (M \times N) \times 2K = 2MNK$$
+    </li>
+  </ul>
+
+  <h2>2. Variables & Notation</h2>
+  <ul>
+    <li>\(N\): Input sequence length (prompt length)</li>
+    <li>\(W\): Sliding window size (\(W \le N\))</li>
+    <li>\(d\): Model hidden dimension</li>
+    <li>\(h\): Number of attention heads</li>
+    <li>\(d_k\): Head dimension, where \(d_k = \frac{d}{h}\)</li>
+  </ul>
+
+  <h2>3. Step 1: Linear Projections (\(Q, K, V, O\))</h2>
+  <p>
+    Before attention scores are calculated, the input representation \(X \in \mathbb{R}^{N \times d}\) must be projected into Query, Key, and Value spaces, followed by the final output projection:
+  </p>
+  <ul>
+    <li><strong>Query Projection (\(X W_Q\)):</strong> \((N \times d) \times (d \times d) \rightarrow \mathbf{2Nd^2}\) FLOPs</li>
+    <li><strong>Key Projection (\(X W_K\)):</strong> \((N \times d) \times (d \times d) \rightarrow \mathbf{2Nd^2}\) FLOPs</li>
+    <li><strong>Value Projection (\(X W_V\)):</strong> \((N \times d) \times (d \times d) \rightarrow \mathbf{2Nd^2}\) FLOPs</li>
+    <li><strong>Output Projection (\(\text{Out} \cdot W_O\)):</strong> \((N \times d) \times (d \times d) \rightarrow \mathbf{2Nd^2}\) FLOPs</li>
+  </ul>
+
+  <div class="callout">
+    <p>
+      <strong>Projection Total:</strong> \(4 \times (2Nd^2) = \mathbf{8Nd^2}\) FLOPs.<br>
+      This cost is identical for both standard MHA and Sliding Window Attention.
+    </p>
+  </div>
+
+  <h2>4. Step 2: Attention Core Computation</h2>
+
+  <h3>A. Standard Causal Multi-Head Attention (MHA)</h3>
+  <p>
+    In autoregressive causal language modeling, token \(i\) only attends to prior tokens \(1 \le j \le i\). The total number of token-to-token interactions across the sequence is:
+  </p>
+  $$\sum_{i=1}^{N} i = \frac{N(N + 1)}{2} \approx \frac{N^2}{2} \text{ pairs per head}$$
+
+  <ul>
+    <li>
+      <strong>Score Computation (\(QK^T\)):</strong><br>
+      $$\text{FLOPs}_{QK^T} = h \times \left(\frac{N^2}{2}\right) \times 2d_k = h \times \frac{N^2}{2} \times 2\left(\frac{d}{h}\right) = \mathbf{N^2 d}$$
+    </li>
+    <li>
+      <strong>Value Blending (\(A \cdot V\)):</strong><br>
+      $$\text{FLOPs}_{AV} = h \times \left(\frac{N^2}{2}\right) \times 2d_k = \mathbf{N^2 d}$$
+    </li>
+  </ul>
+  <p>
+    <strong>Total Core MHA FLOPs:</strong> \(N^2 d + N^2 d = \mathbf{2N^2 d}\)
+    <em>(Confused by the \(N^2 d\) derivation? See the <a href="#causal-breakdown">Step-by-Step Causal Breakdown</a> below.)</em>
+  </p>
+
+  <h3>B. Sliding Window Attention (SWA)</h3>
+  <p>
+    In SWA, a token can look back at at most \(W\) preceding tokens:
+  </p>
+  <ul>
+    <li>The first \(W\) tokens look at \(1, 2, \dots, W\) tokens: \(\frac{W^2}{2}\) pairs</li>
+    <li>The remaining \((N - W)\) tokens look at exactly \(W\) tokens: \((N - W)W\) pairs</li>
+    <li><strong>Total token pairs:</strong> \((N - W)W + \frac{W^2}{2} = NW - \frac{W^2}{2} \approx \mathbf{NW}\) (when \(N \gg W\))</li>
+  </ul>
+
+  <ul>
+    <li>
+      <strong>Score Computation (\(QK^T\)):</strong><br>
+      $$\text{FLOPs}_{QK^T} \approx h \times (NW) \times 2d_k = 2NW(h \cdot d_k) = \mathbf{2NWd}$$
+    </li>
+    <li>
+      <strong>Value Blending (\(A \cdot V\)):</strong><br>
+      $$\text{FLOPs}_{AV} \approx h \times (NW) \times 2d_k = \mathbf{2NWd}$$
+    </li>
+  </ul>
+  <p><strong>Total Core SWA FLOPs:</strong> \(2NWd + 2NWd = \mathbf{4NWd}\)</p>
+
+  <h2>5. Summary Comparison</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Operation</th>
+        <th>Standard Causal MHA</th>
+        <th>Sliding Window Attention (SWA)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Linear Projections</strong><br>(\(Q, K, V, O\))</td>
+        <td>\(8Nd^2\)</td>
+        <td>\(8Nd^2\)</td>
+      </tr>
+      <tr>
+        <td><strong>Score Matrix</strong><br>(\(QK^T\))</td>
+        <td>\(N^2 d\)</td>
+        <td>\(2NWd\)</td>
+      </tr>
+      <tr>
+        <td><strong>Value Context</strong><br>(\(A \cdot V\))</td>
+        <td>\(N^2 d\)</td>
+        <td>\(2NWd\)</td>
+      </tr>
+      <tr>
+        <td><strong>Total Prefill FLOPs</strong></td>
+        <td><strong>\(8Nd^2 + 2N^2 d\)</strong></td>
+        <td><strong>\(8Nd^2 + 4NWd\)</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Core Complexity</strong></td>
+        <td><span class="badge">\(\mathcal{O}(N^2)\)</span> Quadratic</td>
+        <td><span class="badge">\(\mathcal{O}(N \cdot W)\)</span> Linear in \(N\)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Deep Dive Section Added at the End -->
+  <section id="causal-breakdown" class="deep-dive">
+    <h2>Appendix: Step-by-Step Breakdown of \(N^2 d\) in Causal Attention</h2>
+    <p>
+      A common question is: <em>Why is causal attention \(N^2 d\) instead of \(2N^2 d\)?</em> Let's walk through the math step-by-step.
+    </p>
+
+    <h3>1. Why is the sum \(\frac{N(N+1)}{2} \approx \frac{N^2}{2}\)?</h3>
+    <p>
+      In autoregressive language models, tokens cannot look forward into future tokens. Each token only attends to preceding tokens and itself:
+    </p>
+    <ul>
+      <li><strong>Token 1:</strong> attends to \(\{1\}\) \(\rightarrow\) <strong>1 dot product</strong></li>
+      <li><strong>Token 2:</strong> attends to \(\{1, 2\}\) \(\rightarrow\) <strong>2 dot products</strong></li>
+      <li><strong>Token 3:</strong> attends to \(\{1, 2, 3\}\) \(\rightarrow\) <strong>3 dot products</strong></li>
+      <li>...</li>
+      <li><strong>Token \(N\):</strong> attends to \(\{1, 2, \dots, N\}\) \(\rightarrow\) <strong>\(N\) dot products</strong></li>
+    </ul>
+    <p>
+      Summing this series gives:
+      $$\text{Total dot products per head} = \sum_{i=1}^{N} i = \frac{N(N + 1)}{2} \approx \frac{N^2}{2}$$
+      <em>Visual intuition: An \(N \times N\) matrix has \(N^2\) total cells. Causal masking zeros out the upper triangle, computing only the lower triangle (\(\approx \frac{N^2}{2}\) elements).</em>
+    </p>
+
+    <h3>2. FLOPs per Single Head</h3>
+    <p>
+      Each dot product between a query vector and a key vector of length \(d_k\) costs \(2d_k\) FLOPs (\(d_k\) multiplications and \(d_k - 1\) additions):
+      $$\text{FLOPs}_{\text{head}} = \left(\frac{N^2}{2}\right) \times 2d_k = N^2 d_k$$
+    </p>
+
+    <h3>3. Aggregating Across All \(h\) Heads</h3>
+    <p>
+      To get the total cost across all \(h\) heads in the layer:
+      $$\text{Total FLOPs}_{QK^T} = h \times (N^2 d_k) = N^2 (h \cdot d_k)$$
+    </p>
+    <p>
+      Since the total embedding dimension is defined as \(d = h \times d_k\), substituting gives the final result:
+      $$\mathbf{\text{FLOPs}_{QK^T} = N^2 d}$$
+    </p>
+    <ul>
+      <li><strong>Unmasked / Bidirectional Attention (e.g., BERT):</strong> All \(N^2\) cells computed \(\rightarrow \mathbf{2N^2 d}\) FLOPs.</li>
+      <li><strong>Causal / Autoregressive Attention (e.g., GPT, LLaMA):</strong> Lower triangle only (\(\frac{N^2}{2}\)) \(\rightarrow \mathbf{N^2 d}\) FLOPs.</li>
+    </ul>
+  </section>
+
+</article>
+
+</body>
+</html>
