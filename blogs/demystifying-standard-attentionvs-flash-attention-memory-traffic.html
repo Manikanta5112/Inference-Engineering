@@ -1,300 +1,557 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Understanding Memory Traffic: Standard Attention vs. FlashAttention</title>
-  
-  <!-- MathJax Configuration (Directly via jsDelivr CDN) -->
-  <script>
-    window.MathJax = {
-      tex: {
-        inlineMath: [['$', '$'], ['\\(', '\\)']],
-        displayMath: [['$$', '$$'], ['\\[', '\\]']]
-      }
-    };
-  </script>
-  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Understanding Memory Traffic: Standard Attention vs. FlashAttention-2</title>
+    <!-- MathJax 3 Configuration -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            svg: {
+                fontCache: 'global'
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --bg-main: #fbfaf6;
+            --surface: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #475569;
+            --border: #e2e8f0;
+            --accent-green: #10b981;
+            --accent-amber: #f59e0b;
+        }
 
-  <style>
-    :root {
-      --bg-color: #fbfaf6;
-      --text-color: #1f2937;
-      --primary-accent: #2563eb;
-      --card-bg: #ffffff;
-      --border-color: #e5e7eb;
-      --code-bg: #1e1e2e;
-      --code-text: #cdd6f4;
-      --callout-bg: #eff6ff;
-      --callout-border: #3b82f6;
-    }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      line-height: 1.7;
-      color: var(--text-color);
-      background:
-        linear-gradient(90deg, rgba(24, 23, 20, 0.035) 1px, transparent 1px),
-        linear-gradient(180deg, rgba(24, 23, 20, 0.03) 1px, transparent 1px),
-        var(--bg-color);
-      background-size: 28px 28px;
-      margin: 0;
-      padding: 40px 20px;
-    }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+            background:
+                linear-gradient(90deg, rgba(24, 23, 20, 0.035) 1px, transparent 1px),
+                linear-gradient(180deg, rgba(24, 23, 20, 0.03) 1px, transparent 1px),
+                var(--bg-main);
+            background-size: 28px 28px;
+            color: var(--text-main);
+            line-height: 1.7;
+            padding: 40px 20px;
+        }
 
-    .container {
-      max-width: 820px;
-      margin: 0 auto;
-      background: var(--card-bg);
-      padding: 48px;
-      border-radius: 12px;
-      border: 1px solid var(--border-color);
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    }
+        .container {
+            max-width: 880px;
+            margin: 0 auto;
+            background: var(--surface);
+            padding: 48px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border);
+        }
 
-    h1 {
-      font-size: 2.2rem;
-      line-height: 1.25;
-      margin-bottom: 24px;
-      color: #111827;
-    }
+        header {
+            margin-bottom: 36px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 24px;
+        }
 
-    h2 {
-      font-size: 1.5rem;
-      margin-top: 40px;
-      margin-bottom: 16px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid var(--border-color);
-      color: #1f2937;
-    }
+        .tag {
+            display: inline-block;
+            background-color: #dbeafe;
+            color: #1e40af;
+            padding: 4px 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border-radius: 9999px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+        }
 
-    h3 {
-      font-size: 1.2rem;
-      margin-top: 24px;
-      margin-bottom: 12px;
-      color: #374151;
-    }
+        h1 {
+            font-size: 2.25rem;
+            font-weight: 800;
+            line-height: 1.25;
+            color: #0f172a;
+            margin-bottom: 12px;
+        }
 
-    p {
-      margin-bottom: 16px;
-    }
+        .subtitle {
+            font-size: 1.15rem;
+            color: var(--text-muted);
+        }
 
-    ul, ol {
-      margin-bottom: 16px;
-      padding-left: 24px;
-    }
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-top: 36px;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #f1f5f9;
+        }
 
-    li {
-      margin-bottom: 6px;
-    }
+        h3 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #334155;
+            margin-top: 24px;
+            margin-bottom: 12px;
+        }
 
-    .callout {
-      background-color: var(--callout-bg);
-      border-left: 4px solid var(--callout-border);
-      padding: 16px 20px;
-      border-radius: 4px;
-      margin: 20px 0;
-    }
+        p {
+            margin-bottom: 16px;
+            color: #334155;
+        }
 
-    pre {
-      background-color: var(--code-bg);
-      color: var(--code-text);
-      padding: 20px;
-      border-radius: 8px;
-      overflow-x: auto;
-      font-family: "Fira Code", Consolas, Monaco, "Courier New", monospace;
-      font-size: 0.9rem;
-      line-height: 1.5;
-    }
+        ul, ol {
+            margin-bottom: 20px;
+            padding-left: 24px;
+            color: #334155;
+        }
 
-    code {
-      font-family: "Fira Code", Consolas, Monaco, "Courier New", monospace;
-      background: #f3f4f6;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 0.9em;
-    }
+        li {
+            margin-bottom: 8px;
+        }
 
-    pre code {
-      background: transparent;
-      padding: 0;
-    }
+        .callout {
+            background-color: #f0fdf4;
+            border-left: 4px solid var(--accent-green);
+            padding: 16px 20px;
+            border-radius: 0 8px 8px 0;
+            margin: 24px 0;
+        }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 24px 0;
-      font-size: 0.95rem;
-    }
+        .callout-title {
+            font-weight: 700;
+            color: #166534;
+            margin-bottom: 6px;
+        }
 
-    th, td {
-      border: 1px solid var(--border-color);
-      padding: 12px 16px;
-      text-align: left;
-    }
+        .callout p {
+            margin-bottom: 0;
+            color: #14532d;
+        }
 
-    th {
-      background-color: #f9fafb;
-      font-weight: 600;
-    }
+        .table-wrapper {
+            overflow-x: auto;
+            margin: 24px 0;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
 
-    hr {
-      border: 0;
-      height: 1px;
-      background: var(--border-color);
-      margin: 40px 0;
-    }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.95rem;
+        }
 
-    @media (max-width: 640px) {
-      .container {
-        padding: 20px;
-      }
-      h1 {
-        font-size: 1.75rem;
-      }
-    }
-  </style>
+        th {
+            background-color: #f8fafc;
+            color: #475569;
+            font-weight: 600;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+        }
+
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            color: #334155;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background-color: #f8fafc;
+        }
+
+        .math-block {
+            background-color: #f8fafc;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            text-align: center;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+
+        .grid-compare {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 24px 0;
+        }
+
+        @media (max-width: 768px) {
+            .grid-compare {
+                grid-template-columns: 1fr;
+            }
+            .container {
+                padding: 24px 16px;
+            }
+            h1 {
+                font-size: 1.75rem;
+            }
+        }
+
+        .card {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            background-color: #ffffff;
+        }
+
+        .card-standard {
+            border-top: 4px solid #ef4444;
+        }
+
+        .card-flash {
+            border-top: 4px solid #3b82f6;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            background-color: #e2e8f0;
+            color: #475569;
+        }
+
+        footer {
+            margin-top: 48px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+            border-top: 1px solid var(--border);
+            padding-top: 24px;
+        }
+    </style>
 </head>
 <body>
 
-<article class="container">
-  <header>
-    <h1>Memory Traffic in Attention: Standard Attention vs. FlashAttention</h1>
-    <p>A deep dive into GPU memory hierarchies (HBM vs. SRAM), IO-awareness, and the mathematical derivation of FlashAttention's \(\mathcal{O}(N^2 d^2 / M)\) memory footprint.</p>
-  </header>
+<div class="container">
+    <header>
+        <span class="tag">Deep Dive / GPU Systems</span>
+        <h1>Memory Traffic Analysis: Standard Attention vs. FlashAttention-2</h1>
+        <p class="subtitle">A step-by-step breakdown of data movement between GPU High-Bandwidth Memory (HBM) and On-Chip Shared Memory (SRAM).</p>
+    </header>
 
-  <hr>
+    <section>
+        <h2>1. Core Parameters &amp; Notation</h2>
+        <p>Before diving into memory movement, let us define the key mathematical and hardware parameters involved in transformer attention layers:</p>
 
-  <h2>1. Notation and Key Dimensions</h2>
-  <ul>
-    <li><strong>\(N\):</strong> Sequence length (number of tokens).</li>
-    <li><strong>\(d\):</strong> Head dimension (e.g., 64 or 128).</li>
-    <li><strong>\(M\):</strong> Fast on-chip <strong>SRAM capacity</strong> per Streaming Multiprocessor (SM), measured in number of scalar elements.</li>
-    <li><strong>Inputs / Outputs:</strong> \(Q, K, V, O \in \mathbb{R}^{N \times d}\).</li>
-    <li><strong>Intermediate Attention Matrices:</strong> Attention scores \(S, P \in \mathbb{R}^{N \times N}\).</li>
-  </ul>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Description</th>
+                        <th>Typical Values / Formula</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>$N$</strong></td>
+                        <td>Sequence length (number of input tokens)</td>
+                        <td>$2048, 4096, 8192, \dots$</td>
+                    </tr>
+                    <tr>
+                        <td><strong>$d$</strong></td>
+                        <td>Head dimension / embedding dimension per head</td>
+                        <td>$64, 128$</td>
+                    </tr>
+                    <tr>
+                        <td><strong>$M$</strong></td>
+                        <td>Fast on-chip <strong>SRAM</strong> capacity per SM</td>
+                        <td>$100\text{ KB} - 228\text{ KB}$</td>
+                    </tr>
+                    <tr>
+                        <td><strong>$B_r$</strong></td>
+                        <td>Query block row size loaded into SRAM</td>
+                        <td>$B_r = \min\left(\left\lceil \frac{M}{4d} \right\rceil, d\right) \approx 64 \text{ or } 128$</td>
+                    </tr>
+                    <tr>
+                        <td><strong>$B_c$</strong></td>
+                        <td>Key/Value block column size loaded into SRAM</td>
+                        <td>$B_c = \left\lceil \frac{M}{4d} \right\rceil \approx 64 \text{ or } 128$</td>
+                    </tr>
+                    <tr>
+                        <td><strong>$T_r$</strong></td>
+                        <td>Total number of Query blocks</td>
+                        <td>$T_r = \left\lceil \frac{N}{B_r} \right\rceil$</td>
+                    </tr>
+                    <tr>
+                        <td><strong>$T_c$</strong></td>
+                        <td>Total number of Key/Value blocks</td>
+                        <td>$T_c = \left\lceil \frac{N}{B_c} \right\rceil$</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
 
-  <hr>
+    <section>
+        <h2>2. FlashAttention-2 Memory Traffic Table</h2>
+        <p>In FlashAttention-2, the <strong>outer loop iterates over Query blocks ($Q$)</strong>, while the <strong>inner loop iterates over Key/Value blocks ($K, V$)</strong>. The full $N \times N$ intermediate attention matrices ($S, P$) are computed and accumulated purely in SRAM without touching HBM.</p>
 
-  <h2>2. Standard Attention Memory Traffic</h2>
-  <p>Standard multi-head attention executes as sequential, discrete GPU kernel launches. It repeatedly reads and writes full \(N \times N\) intermediate matrices to and from slower High Bandwidth Memory (HBM).</p>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Step</th>
+                        <th>Read (HBM &rarr; SRAM)</th>
+                        <th>Compute (Inside SRAM)</th>
+                        <th>Write (SRAM &rarr; HBM)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>1. Load Query Block</strong></td>
+                        <td>$Q_i \in \mathbb{R}^{B_r \times d}$</td>
+                        <td>-</td>
+                        <td><span class="badge">0</span> (No write)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>2. Stream $K, V$ Blocks</strong></td>
+                        <td>$K_j, V_j \in \mathbb{R}^{B_c \times d}$</td>
+                        <td>$S_{ij} = Q_i K_j^T \in \mathbb{R}^{B_r \times B_c}$</td>
+                        <td><span class="badge">0</span> (Kept in SRAM)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>3. Online Softmax</strong></td>
+                        <td><span class="badge">0</span> (Already in SRAM)</td>
+                        <td>$P_{ij} = \text{softmax}(S_{ij}) \in \mathbb{R}^{B_r \times B_c}$</td>
+                        <td><span class="badge">0</span> (Kept in SRAM)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>4. Accumulate Output</strong></td>
+                        <td><span class="badge">0</span> (Already in SRAM)</td>
+                        <td>$O_i = O_i + P_{ij} V_j \in \mathbb{R}^{B_r \times d}$</td>
+                        <td><span class="badge">0</span> (Accumulated in SRAM)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>5. Store Output</strong></td>
+                        <td>-</td>
+                        <td>Final rescaling of $O_i$</td>
+                        <td>$O_i \in \mathbb{R}^{B_r \times d}$</td>
+                    </tr>
+                    <tr>
+                        <td><strong>6. Store Stats (Backward)</strong></td>
+                        <td>-</td>
+                        <td>$L_i \in \mathbb{R}^{B_r}$ (LogSumExp)</td>
+                        <td>$L_i \in \mathbb{R}^{B_r}$</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
 
-  <pre><code>HBM                    SRAM (Compute)                    HBM
----                    --------------                    ---
-[Q, K]       ----->    Compute S = Q K^T      ----->    [S (N x N)]
-[S]          ----->    Compute P = softmax(S) ----->    [P (N x N)]
-[P, V]       ----->    Compute O = P V        ----->    [O (N x d)]</code></pre>
+    <section>
+        <h2>3. Clarifying Tile vs. Block Dimensions &amp; K/V Traffic</h2>
+        <p>A common point of confusion when analyzing FlashAttention is how tiles are dimensioned and why the total traffic for $K$ and $V$ is $2 \frac{N^2 d}{B_r}$:</p>
 
-  <h3>Step-by-Step HBM Data Transfers</h3>
-  <ol>
-    <li><strong>Score Matrix (\(S = Q K^T\)):</strong>
-      <ul>
-        <li>Read \(Q\) (\(Nd\)) and \(K\) (\(Nd\)) \(\rightarrow 2Nd\)</li>
-        <li>Write \(S\) to HBM \(\rightarrow N^2\)</li>
-      </ul>
-    </li>
-    <li><strong>Softmax Normalization (\(P = \text{softmax}(S)\)):</strong>
-      <ul>
-        <li>Read \(S\) from HBM \(\rightarrow N^2\)</li>
-        <li>Write normalized probabilities \(P\) to HBM \(\rightarrow N^2\)</li>
-      </ul>
-    </li>
-    <li><strong>Context Matrix (\(O = P V\)):</strong>
-      <ul>
-        <li>Read \(P\) (\(N^2\)) and \(V\) (\(Nd\)) \(\rightarrow N^2 + Nd\)</li>
-        <li>Write output \(O\) to HBM \(\rightarrow Nd\)</li>
-      </ul>
-    </li>
-  </ol>
+        <div class="callout" style="background-color: #f8fafc; border-left: 4px solid var(--primary); margin-bottom: 24px;">
+            <div class="callout-title" style="color: var(--primary-dark);">Terminology Note: "Tile" vs. "Block"</div>
+            <p style="color: var(--text-main);">In GPU literature and FlashAttention papers, <strong>Tile</strong> and <strong>Block</strong> mean the exact same thing: a sub-matrix slice ($B_r \times d$ or $B_c \times d$) loaded into fast on-chip SRAM.</p>
+        </div>
 
-  <div class="callout">
-    <strong>Total Standard HBM Traffic:</strong>
-    $$\text{Total}_{\text{Standard}} = \underbrace{4Nd}_{\text{I/O (Q, K, V, O)}} + \underbrace{4N^2}_{\text{Intermediates (S, P)}} = \mathcal{O}(Nd + N^2)$$
-    <p>When \(N \gg d\), the \(4N^2\) term completely dominates, rendering execution memory-bandwidth bound.</p>
-  </div>
+        <h3>1. Dimension of a Single Tile (Chunk)</h3>
+        <p>When loading a single Key or Value tile into on-chip SRAM:</p>
+        <ul>
+            <li>Tile length (row count) = $B_c$</li>
+            <li>Embedding / head dimension (column count) = $d$</li>
+            <li><strong>Elements in a single tile of $K$ and $V$:</strong> $(B_c \times d) + (B_c \times d)$</li>
+        </ul>
 
-  <hr>
+        <h3>2. Streaming All Tiles Across One Pass</h3>
+        <p>To sweep through the entire sequence of length $N$ in the inner loop:</p>
+        <ul>
+            <li>Number of column tiles = $\frac{N}{B_c}$</li>
+            <li><strong>Total elements in one complete pass:</strong>
+                $$\left(\frac{N}{B_c}\right) \times (B_c \times d) = N \times d$$
+            </li>
+        </ul>
+        <p>The tile size $B_c$ cancels out. One full pass across all column tiles loads exactly $N \times d$ elements of $K$ and $N \times d$ elements of $V$.</p>
 
-  <h2>3. FlashAttention Memory Traffic</h2>
-  <p>FlashAttention utilizes <strong>kernel fusion</strong> and <strong>tiling</strong> paired with the <strong>Online Softmax</strong> algorithm to compute attention without ever materializing the \(N \times N\) matrices into HBM.</p>
+        <h3>3. Total Memory Traffic Across the Outer Loop</h3>
+        <p>In FlashAttention-2, the outer loop repeats for every single Query tile $Q_i$:</p>
+        <ul>
+            <li>Total number of Query tiles = $\frac{N}{B_r}$ (where $B_r$ is the query tile length).</li>
+            <li>For <strong>each</strong> Query tile, the inner loop streams the entire sequence of $K$ and $V$ from HBM to SRAM:</li>
+        </ul>
 
-  <h3>Tiling Budget and Block Size</h3>
-  <p>To compute attention inside SRAM, the blocks of \(Q_i\), \(K_j\), \(V_j\), and the accumulator \(O_i\) must fit within SRAM capacity \(M\) simultaneously:</p>
-  $$\text{SRAM footprint} \approx B_r \cdot d + B_c \cdot d + B_c \cdot d + B_r \cdot d = 2d(B_r + B_c) \le M$$
-  
-  <p>Setting \(B_r \approx B_c = B\):</p>
-  $$4 \cdot B \cdot d \le M \implies B \approx \frac{M}{4d}$$
+        <div class="math-block">
+            $$\text{Total Read Traffic for } K, V = \underbrace{\left(\frac{N}{B_r}\right)}_{\text{Number of Q tiles}} \times \underbrace{\Big[(N \times d) + (N \times d)\Big]}_{\text{Full K and V sequence per pass}} = 2 \left(\frac{N^2 d}{B_r}\right)$$
+        </div>
 
-  <h3>Derivation of the \(\mathcal{O}\left(\frac{N^2 d^2}{M}\right)\) Term</h3>
-  <p>Consider the outer loop over \(Q\) tiles and inner loop over \(K, V\) tiles:</p>
+        <p><em>Why is $\left(\frac{N}{\text{tile\_length}}\right) \times d$ not the tile size?</em> Because $\frac{N}{\text{tile\_length}}$ represents the <strong>count of tiles</strong> (a dimensionless number), while each loaded slice has dimension $\text{tile\_length} \times d$.</p>
+    </section>
 
-  <pre><code># Total blocks along sequence length
-num_blocks = N / B  # where B ≈ M / (4d)
+    <section>
+        <h2>4. Mathematical Derivation of Total Memory Traffic</h2>
 
-for i in range(num_blocks):  # Outer Loop (over Q blocks)
-    # 1. Load Q_i into SRAM (size: B x d)
+        <h3>FlashAttention-2 Read Traffic</h3>
+        <ul>
+            <li><strong>Read $Q$:</strong> Each query block is loaded into SRAM once in the outer loop:
+                $$\text{Reads}_{Q} = T_r \cdot (B_r \cdot d) = N \cdot d$$
+            </li>
+            <li><strong>Read $K$ and $V$:</strong> For every outer query block ($T_r$ iterations), all $T_c$ blocks of $K$ and $V$ are streamed:
+                $$\text{Reads}_{K, V} = 2 \cdot T_r \cdot \sum_{j=1}^{T_c} (B_c \cdot d) = 2 \cdot T_r \cdot (N \cdot d) = 2 \cdot \left(\frac{N}{B_r}\right) \cdot N d = 2 \frac{N^2 d}{B_r}$$
+            </li>
+        </ul>
 
-    for j in range(num_blocks):  # Inner Loop (over K, V blocks)
-        # 2. Load K_j, V_j into SRAM (size: 2 * B * d)
-        # 3. Compute partial tile & update accumulator in SRAM
+        <div class="math-block">
+            $$\text{Total HBM Reads} = Nd + 2\left(\frac{N^2 d}{B_r}\right)$$
+        </div>
 
-    # 4. Write final O_i back to HBM (size: B x d)</code></pre>
+        <h3>FlashAttention-2 Write Traffic</h3>
+        <ul>
+            <li><strong>Write $O$:</strong> Output matrix $O$ is written once per query block when inner accumulation completes:
+                $$\text{Writes}_{O} = T_r \cdot (B_r \cdot d) = N \cdot d$$
+            </li>
+            <li><strong>Write Softmax Stats ($L$):</strong> Log-sum-exp values written for backward pass:
+                $$\text{Writes}_{L} = T_r \cdot B_r = N$$
+            </li>
+        </ul>
 
-  <ol>
-    <li><strong>Outer Loop Iterations:</strong>
-      $$\text{Iterations} = \frac{N}{B} \approx \frac{N}{\frac{M}{4d}} = \frac{4Nd}{M}$$
-    </li>
-    <li><strong>Inner Loop Transfers:</strong> In every single outer iteration, the inner loop sweeps through the entire sequence of \(K\) and \(V\) matrices (\(2Nd\) elements total).</li>
-    <li><strong>Total Reads of \(K\) and \(V\):</strong>
-      $$\text{Total Reads} = (\text{Outer Iterations}) \times (\text{Size of } K \text{ and } V) = \left(\frac{4Nd}{M}\right) \times (2Nd) = \frac{8N^2 d^2}{M} = \mathcal{O}\left(\frac{N^2 d^2}{M}\right)$$
-    </li>
-  </ol>
+        <div class="math-block">
+            $$\text{Total HBM Writes} = Nd + N$$
+        </div>
 
-  <div class="callout">
-    <strong>Total FlashAttention HBM Traffic:</strong>
-    $$\text{Total}_{\text{Flash}} = \underbrace{2Nd}_{\text{Read Q, Write O}} + \underbrace{\mathcal{O}\left(\frac{N^2 d^2}{M}\right)}_{\text{Repeated reads of K, V}} = \mathcal{O}\left(Nd + \frac{N^2 d^2}{M}\right)$$
-  </div>
+        <div class="callout">
+            <div class="callout-title">Total FlashAttention-2 HBM Traffic Summary</div>
+            <p>
+                $$\text{Total Traffic} = 2Nd + N + 2\left(\frac{N^2 d}{B_r}\right) = \mathcal{O}\left(Nd + \frac{N^2 d^2}{M}\right)$$
+            </p>
+        </div>
+    </section>
 
-  <hr>
+    <section>
+        <h2>5. Side-by-Side Comparison</h2>
 
-  <h2>4. Architectural Summary</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Metric</th>
-        <th>Standard Attention</th>
-        <th>FlashAttention</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><strong>Materializes \(N \times N\) to HBM?</strong></td>
-        <td>Yes (\(S\) and \(P\))</td>
-        <td>No (Kept in fast SRAM)</td>
-      </tr>
-      <tr>
-        <td><strong>HBM Read Volume</strong></td>
-        <td>\(2Nd + 2N^2\)</td>
-        <td>\(Nd + \mathcal{O}\left(\frac{N^2 d^2}{M}\right)\)</td>
-      </tr>
-      <tr>
-        <td><strong>HBM Write Volume</strong></td>
-        <td>\(2N^2 + Nd\)</td>
-        <td>\(Nd\)</td>
-      </tr>
-      <tr>
-        <td><strong>Memory Complexity</strong></td>
-        <td>\(\mathcal{O}(N^2)\)</td>
-        <td>\(\mathcal{O}\left(Nd + \frac{N^2 d^2}{M}\right)\)</td>
-      </tr>
-      <tr>
-        <td><strong>Primary Bound</strong></td>
-        <td>Memory-Bandwidth Bound</td>
-        <td>Compute (FLOPs) Bound</td>
-      </tr>
-    </tbody>
-  </table>
-</article>
+        <div class="grid-compare">
+            <div class="card card-standard">
+                <div class="card-title" style="color: #b91c1c;">Standard Attention</div>
+                <p><strong>Reads from HBM:</strong></p>
+                <ul>
+                    <li>$Q, K$: $2 \times Nd$</li>
+                    <li>Score $S$: $N^2$</li>
+                    <li>Attention $P, V$: $N^2 + Nd$</li>
+                </ul>
+                <p><strong>Writes to HBM:</strong></p>
+                <ul>
+                    <li>Score $S$: $N^2$</li>
+                    <li>Attention $P$: $N^2$</li>
+                    <li>Output $O$: $Nd$</li>
+                </ul>
+                <div class="math-block" style="border-color: #fecaca; background: #fff5f5;">
+                    <strong>Total Traffic:</strong><br>
+                    $4Nd + 4N^2 = \mathcal{O}(Nd + N^2)$
+                </div>
+            </div>
+
+            <div class="card card-flash">
+                <div class="card-title" style="color: #1d4ed8;">FlashAttention-2</div>
+                <p><strong>Reads from HBM:</strong></p>
+                <ul>
+                    <li>Query $Q$: $Nd$</li>
+                    <li>Keys &amp; Values $K, V$: $2 \frac{N^2 d}{B_r}$</li>
+                    <li>Scores $S, P$: <strong>0</strong> (SRAM only)</li>
+                </ul>
+                <p><strong>Writes to HBM:</strong></p>
+                <ul>
+                    <li>Output $O$: $Nd$</li>
+                    <li>LogSumExp Stats $L$: $N$</li>
+                    <li>Scores $S, P$: <strong>0</strong> (SRAM only)</li>
+                </ul>
+                <div class="math-block" style="border-color: #bfdbfe; background: #eff6ff;">
+                    <strong>Total Traffic:</strong><br>
+                    $2Nd + N + 2\frac{N^2 d}{B_r} = \mathcal{O}\left(Nd + \frac{N^2 d^2}{M}\right)$
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>6. Concrete Numerical Example</h2>
+        <p>Let's calculate the exact memory traffic for a realistic transformer configuration:</p>
+        <ul>
+            <li>Sequence Length $N = 4096$</li>
+            <li>Head Dimension $d = 64$</li>
+            <li>SRAM Block Size $B_r = 64, B_c = 64$</li>
+            <li>Number of Blocks $T_r = \frac{4096}{64} = 64$</li>
+            <li>Data Type: FP16 (2 bytes per element)</li>
+        </ul>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Standard Attention</th>
+                        <th>FlashAttention-2</th>
+                        <th>Reduction Factor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Intermediate $S, P$ Traffic</strong></td>
+                        <td>$4 \times 4096^2 = 67.11\text{M elements}$</td>
+                        <td><strong>0 elements</strong></td>
+                        <td>&infin; (Eliminated)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>$Q, K, V, O$ Vector Traffic</strong></td>
+                        <td>$4 \times (4096 \times 64) = 1.05\text{M elements}$</td>
+                        <td>$2Nd + N + 2\frac{N^2 d}{B_r} \approx 34.08\text{M elements}$</td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Total Traffic (Elements)</strong></td>
+                        <td>$68.16\text{M elements}$</td>
+                        <td>$34.08\text{M elements}$</td>
+                        <td><strong>~2.0&times; speedup</strong></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Total Memory Transferred (Bytes)</strong></td>
+                        <td>$\approx 136.3\text{ MB}$</td>
+                        <td>$\approx 68.2\text{ MB}$</td>
+                        <td><strong>50% reduction in I/O</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <p><em>Note: As sequence length $N$ scales to 16k, 32k, or 128k, the $\mathcal{O}(N^2)$ memory traffic reduction grows from $2\times$ to $10\times - 30\times$, vastly outperforming standard attention while saving gigabytes of peak VRAM.</em></p>
+    </section>
+
+    <footer>© 2026 Mani &middot; Inference Engineering</footer>
+</div>
 
 </body>
 </html>
