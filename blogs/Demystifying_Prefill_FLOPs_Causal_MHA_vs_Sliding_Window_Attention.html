@@ -13,7 +13,7 @@
 
   <style>
     :root {
-      --bg-color: #f8fafc;
+      --bg-color: #fbfaf6;
       --card-bg: #ffffff;
       --text-main: #1e293b;
       --text-muted: #64748b;
@@ -29,7 +29,11 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
       line-height: 1.7;
       color: var(--text-main);
-      background-color: var(--bg-color);
+      background:
+        linear-gradient(90deg, rgba(24, 23, 20, 0.035) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(24, 23, 20, 0.03) 1px, transparent 1px),
+        var(--bg-color);
+      background-size: 28px 28px;
       margin: 0;
       padding: 40px 20px;
     }

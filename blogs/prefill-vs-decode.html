@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Prefill vs Decode — Visually</title>
+<title>Prefill vs Decode - Visually</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0d0f14; --bg-panel:#14161d; --bg-card:#191c25; --line:#2a2e3a; --line-soft:#1e212b;
-    --text:#e6e8ee; --text-dim:#8b90a0; --text-faint:#565b6b;
-    --accent:#e8a355; --teal:#4fd1c5; --violet:#a78bfa; --red:#e0715c; --teal-dim:#2a5a56;
+    --bg:#fbfaf6; --bg-panel:#fffdf8; --bg-card:#f1ebe2; --line:#ddd5ca; --line-soft:#e7dfd1;
+    --text:#181714; --text-dim:#67615a; --text-faint:#9a948a;
+    --accent:#9a742c; --teal:#2f7376; --violet:#64518f; --red:#9b4b3d; --teal-dim:#a9d0cb;
     --font-d:'Space Grotesk',sans-serif; --font-m:'JetBrains Mono',monospace; --font-b:'Inter',sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -39,7 +39,7 @@
   .stage-row{display:flex;gap:14px;flex-wrap:wrap;margin-top:26px;}
   .stage-card{flex:1;min-width:260px;background:var(--bg-card);border:1px solid var(--line);border-radius:12px;padding:20px;}
   .stage-card.prefill{border-color:var(--teal-dim);}
-  .stage-card.decode{border-color:#5a3f2a;}
+  .stage-card.decode{border-color:#d8c088;}
   .stage-card .stag{font-family:var(--font-m);font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
   .prefill .stag{color:var(--teal);}
   .decode .stag{color:var(--accent);}
@@ -49,18 +49,18 @@
   /* animated demo shared */
   .demo{margin-top:30px;background:var(--bg-panel);border:1px solid var(--line);border-radius:14px;padding:24px;}
   .demo-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;}
-  button.run-btn{font-family:var(--font-m);background:var(--accent);color:#1a1206;border:none;padding:9px 18px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;}
-  button.run-btn:hover{background:#f0b46e;}
+  button.run-btn{font-family:var(--font-m);background:var(--accent);color:#fffdf8;border:none;padding:9px 18px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;}
+  button.run-btn:hover{background:#b98f42;}
   button.run-btn:disabled{opacity:.4;cursor:default;}
   button.run-btn.teal{background:var(--teal);}
-  button.run-btn.teal:hover{background:#7fe0d6;}
+  button.run-btn.teal:hover{background:#3f8e92;}
   .demo-status{font-family:var(--font-m);font-size:12.5px;color:var(--text-dim);min-height:18px;}
   .demo-status b{color:var(--accent);}
 
   .lane{position:relative;height:52px;background:var(--bg-card);border:1px solid var(--line);border-radius:8px;margin-bottom:10px;}
   .lane.active{border-color:var(--teal);box-shadow:0 0 0 1px var(--teal) inset;}
   .lane-tag{position:absolute;left:8px;top:6px;font-family:var(--font-m);font-size:9.5px;color:var(--text-faint);text-transform:uppercase;}
-  .chip{position:absolute;top:20px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--font-m);font-size:10px;font-weight:700;color:#0a0d12;transition:left .55s cubic-bezier(.4,0,.2,1), width .3s ease;}
+  .chip{position:absolute;top:20px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--font-m);font-size:10px;font-weight:700;color:#fffdf8;transition:left .55s cubic-bezier(.4,0,.2,1), width .3s ease;}
   .chip-w{background:var(--teal);width:34px;}
   .chip-tok{background:var(--violet);color:#fff;width:30px;}
   .counters{margin-top:18px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
@@ -76,7 +76,7 @@
   .cmp-table td.hl-decode{color:var(--accent);font-weight:700;}
 
   /* roofline */
-  .roofline{position:relative;height:50px;border-radius:8px;background:linear-gradient(90deg,#3a2c26 0%,#3a2c26 55%,#20342c 55%,#20342c 100%);border:1px solid var(--line-soft);margin-top:22px;}
+  .roofline{position:relative;height:50px;border-radius:8px;background:linear-gradient(90deg,#f2e6df 0%,#f2e6df 55%,#e3ede8 55%,#e3ede8 100%);border:1px solid var(--line-soft);margin-top:22px;}
   .rl-label{position:absolute;top:6px;font-family:var(--font-m);font-size:11px;color:var(--text-dim);}
   .rl-mem{left:10px;} .rl-comp{right:10px;}
   .marker{position:absolute;top:-8px;width:3px;height:66px;transition:left .5s ease;}
@@ -104,7 +104,7 @@
   </header>
 
   <section id="journey">
-    <div class="kicker">01 — The full journey</div>
+    <div class="kicker">01 - The full journey</div>
     <h2>One prompt, two phases</h2>
     <p class="body">Say you type this prompt. The <b>teal</b> tokens all get processed together in one shot (prefill). Then the model starts producing the <b>orange</b> tokens, one at a time, each one depending on everything before it (decode).</p>
     <div class="prompt-flow">
@@ -120,40 +120,40 @@
       <div class="stage-card prefill">
         <div class="stag">Prefill</div>
         <h3>Read the prompt</h3>
-        <p>All 5 input tokens go through the model together, as one batched matmul. This also builds the <b>KV cache</b> — a saved copy of each prompt token's Key/Value vectors, so decode never has to reprocess the prompt.</p>
+        <p>All 5 input tokens go through the model together, as one batched matmul. This also builds the <b>KV cache</b> - a saved copy of each prompt token's Key/Value vectors, so decode never has to reprocess the prompt.</p>
       </div>
       <div class="stage-card decode">
         <div class="stag">Decode</div>
         <h3>Write the reply</h3>
-        <p>One new token at a time. Each step only needs to process that single new token — but still needs the <i>entire</i> weight matrix pulled in from HBM to do it.</p>
+        <p>One new token at a time. Each step only needs to process that single new token - but still needs the <i>entire</i> weight matrix pulled in from HBM to do it.</p>
       </div>
     </div>
   </section>
 
   <section id="prefill-demo">
-    <div class="kicker">02 — Watch prefill</div>
+    <div class="kicker">02 - Watch prefill</div>
     <h2>One weight fetch, reused across every prompt token</h2>
-    <p class="body">Press run: the weight tile loads from HBM <b>once</b>, then all 5 prompt tokens pass through it while it's still sitting in fast memory. That's high reuse per byte fetched — <b>compute-bound</b>.</p>
+    <p class="body">Press run: the weight tile loads from HBM <b>once</b>, then all 5 prompt tokens pass through it while it's still sitting in fast memory. That's high reuse per byte fetched - <b>compute-bound</b>.</p>
 
     <div class="demo">
       <div class="demo-head">
         <button class="run-btn teal" id="runPrefill">▶ Run prefill</button>
-        <div class="demo-status" id="prefillStatus">idle — 5 tokens queued</div>
+        <div class="demo-status" id="prefillStatus">idle - 5 tokens queued</div>
       </div>
       <div class="lane" id="pf-hbm"><div class="lane-tag">HBM</div></div>
       <div class="lane" id="pf-onchip"><div class="lane-tag">On-chip (L1/registers)</div></div>
       <div class="counters">
         <div class="counter"><div class="cl">HBM trips for W</div><div class="cv" id="pfTrips">0</div></div>
         <div class="counter"><div class="cl">Tokens reusing it</div><div class="cv" id="pfReuse">0</div></div>
-        <div class="counter"><div class="cl">Arithmetic intensity</div><div class="cv" id="pfAI">—</div></div>
+        <div class="counter"><div class="cl">Arithmetic intensity</div><div class="cv" id="pfAI">-</div></div>
       </div>
     </div>
   </section>
 
   <section id="decode-demo">
-    <div class="kicker">03 — Watch decode</div>
+    <div class="kicker">03 - Watch decode</div>
     <h2>One weight fetch, per single token, every time</h2>
-    <p class="body">Press run: for <i>each new token</i>, the same weight matrix has to make the full HBM trip again — used once, evicted, fetched again for the next token. That's minimal reuse per byte — <b>memory-bound</b>.</p>
+    <p class="body">Press run: for <i>each new token</i>, the same weight matrix has to make the full HBM trip again - used once, evicted, fetched again for the next token. That's minimal reuse per byte - <b>memory-bound</b>.</p>
 
     <div class="demo">
       <div class="demo-head">
@@ -165,15 +165,15 @@
       <div class="counters">
         <div class="counter"><div class="cl">HBM trips for W</div><div class="cv" id="dcTrips">0</div></div>
         <div class="counter"><div class="cl">Tokens per trip</div><div class="cv" id="dcReuse">1</div></div>
-        <div class="counter"><div class="cl">Arithmetic intensity</div><div class="cv" id="dcAI">—</div></div>
+        <div class="counter"><div class="cl">Arithmetic intensity</div><div class="cv" id="dcAI">-</div></div>
       </div>
     </div>
   </section>
 
   <section id="compare">
-    <div class="kicker">04 — Side by side</div>
+    <div class="kicker">04 - Side by side</div>
     <h2>Same formula, wildly different numbers</h2>
-    <p class="body">Using <span class="mono">d=4096</span>, fp16 (p=2), and the 2nd²/bytes formulas from earlier — prefill batches n=512 prompt tokens, decode processes n=1:</p>
+    <p class="body">Using <span class="mono">d=4096</span>, fp16 (p=2), and the 2nd²/bytes formulas from earlier - prefill batches n=512 prompt tokens, decode processes n=1:</p>
 
     <table class="cmp-table">
       <tr><th></th><th>Prefill (n=512)</th><th>Decode (n=1)</th></tr>
@@ -189,13 +189,13 @@
       <div class="marker mk-decode" style="left:2%;" data-label="decode n=1"></div>
       <div class="marker mk-prefill" style="left:92%;" data-label="prefill n=512"></div>
     </div>
-    <p class="body" style="margin-top:16px;">Ridge point for an H100-class chip (989 TFLOPs ÷ 3.35 TB/s) sits around <b>295 FLOPs/byte</b> — prefill clears it easily, decode isn't remotely close.</p>
+    <p class="body" style="margin-top:16px;">Ridge point for an H100-class chip (989 TFLOPs ÷ 3.35 TB/s) sits around <b>295 FLOPs/byte</b> - prefill clears it easily, decode isn't remotely close.</p>
   </section>
 
   <section id="fix">
-    <div class="kicker">05 — The fix</div>
+    <div class="kicker">05 - The fix</div>
     <h2>Batching drags decode toward compute-bound</h2>
-    <p class="body">If you batch multiple users' decode requests together, the matmul's n goes from 1 to the batch size. Same weight tile loaded once, but now reused across every request in the batch. Drag the slider — this is the exact lever inference servers (vLLM, TensorRT-LLM, etc.) pull.</p>
+    <p class="body">If you batch multiple users' decode requests together, the matmul's n goes from 1 to the batch size. Same weight tile loaded once, but now reused across every request in the batch. Drag the slider - this is the exact lever inference servers (vLLM, TensorRT-LLM, etc.) pull.</p>
 
     <div class="lab">
       <div class="lab-row">
@@ -203,10 +203,10 @@
         <input type="range" id="batchSlider" min="1" max="256" value="1">
       </div>
       <div class="lab-readout">
-        <div class="k">FLOPs</div><div class="v" id="labFlops">—</div>
-        <div class="k">bytes</div><div class="v" id="labBytes">—</div>
-        <div class="k">intensity</div><div class="v" id="labAI">—</div>
-        <div class="k">regime</div><div class="v" id="labRegime">—</div>
+        <div class="k">FLOPs</div><div class="v" id="labFlops">-</div>
+        <div class="k">bytes</div><div class="v" id="labBytes">-</div>
+        <div class="k">intensity</div><div class="v" id="labAI">-</div>
+        <div class="k">regime</div><div class="v" id="labRegime">-</div>
       </div>
       <div class="roofline">
         <div class="rl-label rl-mem">memory-bound</div>
@@ -234,7 +234,7 @@
 
   async function runPrefill(){
     pfBtn.disabled = true;
-    pfTrips.textContent = '0'; pfReuse.textContent = '0'; pfAI.textContent = '—';
+    pfTrips.textContent = '0'; pfReuse.textContent = '0'; pfAI.textContent = '-';
     pfHbm.innerHTML = '<div class="lane-tag">HBM</div>'; pfOnchip.innerHTML = '<div class="lane-tag">On-chip (L1/registers)</div>';
 
     const w = document.createElement('div');
@@ -249,7 +249,7 @@
     pfOnchip.appendChild(w);
     requestAnimationFrame(()=>{ w.style.left = '80px'; });
     pfTrips.textContent = '1';
-    pfStatus.innerHTML = '<b>1 HBM trip</b> — now reusing it for every prompt token…';
+    pfStatus.innerHTML = '<b>1 HBM trip</b> - now reusing it for every prompt token…';
     await wait(500);
 
     for(let i=0;i<5;i++){
@@ -268,7 +268,7 @@
       t.remove();
     }
     pfAI.textContent = '≈410 F/B';
-    pfStatus.innerHTML = '<b>Done.</b> 1 trip to HBM served 5 tokens — high reuse, compute-bound.';
+    pfStatus.innerHTML = '<b>Done.</b> 1 trip to HBM served 5 tokens - high reuse, compute-bound.';
     pfBtn.disabled = false;
   }
   pfBtn.addEventListener('click', runPrefill);
@@ -284,7 +284,7 @@
 
   async function runDecode(){
     dcBtn.disabled = true;
-    dcTrips.textContent = '0'; dcAI.textContent = '—';
+    dcTrips.textContent = '0'; dcAI.textContent = '-';
     let trips = 0;
 
     for(let i=0;i<3;i++){
@@ -294,7 +294,7 @@
       const w = document.createElement('div');
       w.className = 'chip chip-w'; w.textContent = 'W'; w.style.left = '80px';
       dcHbm.appendChild(w);
-      dcStatus.innerHTML = `Generating "<b>${genTokens[i]}</b>" — fetching the <i>entire</i> weight tile again from HBM…`;
+      dcStatus.innerHTML = `Generating "<b>${genTokens[i]}</b>" - fetching the <i>entire</i> weight tile again from HBM…`;
       dcHbm.classList.add('active');
       await wait(550);
       dcHbm.classList.remove('active');
@@ -315,7 +315,7 @@
       await wait(500);
     }
     dcAI.textContent = '≈1 F/B';
-    dcStatus.innerHTML = `<b>Done.</b> ${trips} separate HBM trips for ${trips} tokens — almost no reuse, memory-bound.`;
+    dcStatus.innerHTML = `<b>Done.</b> ${trips} separate HBM trips for ${trips} tokens - almost no reuse, memory-bound.`;
     dcBtn.disabled = false;
   }
   dcBtn.addEventListener('click', runDecode);

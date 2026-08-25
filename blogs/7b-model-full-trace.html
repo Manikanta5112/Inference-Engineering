@@ -8,9 +8,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0d0f14; --bg-panel:#14161d; --bg-card:#191c25; --line:#2a2e3a; --line-soft:#1e212b;
-    --text:#e6e8ee; --text-dim:#8b90a0; --text-faint:#565b6b;
-    --accent:#e8a355; --teal:#4fd1c5; --violet:#a78bfa; --teal-dim:#2a5a56; --accent-dim:#5a3f2a;
+    --bg:#fbfaf6; --bg-panel:#fffdf8; --bg-card:#f1ebe2; --line:#ddd5ca; --line-soft:#e7dfd1;
+    --text:#181714; --text-dim:#67615a; --text-faint:#9a948a;
+    --accent:#9a742c; --teal:#2f7376; --violet:#64518f; --teal-dim:#a9d0cb; --accent-dim:#d8c088;
     --font-d:'Space Grotesk',sans-serif; --font-m:'JetBrains Mono',monospace; --font-b:'Inter',sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -40,8 +40,8 @@
     font-family:var(--font-m); font-size:11px; text-transform:uppercase; letter-spacing:.08em;
     padding:6px 12px; border-radius:20px; margin-bottom:16px; border:1px solid var(--line);
   }
-  .phase-badge.prefill{ color:var(--teal); border-color:var(--teal-dim); background:rgba(79,209,197,0.08);}
-  .phase-badge.decode{ color:var(--accent); border-color:var(--accent-dim); background:rgba(232,163,85,0.08);}
+  .phase-badge.prefill{ color:var(--teal); border-color:var(--teal-dim); background:rgba(47,115,118,0.08);}
+  .phase-badge.decode{ color:var(--accent); border-color:var(--accent-dim); background:rgba(154,116,44,0.08);}
   .phase-badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
 
   .step-title{font-family:var(--font-d); font-size:20px; font-weight:600; margin-bottom:8px;}
@@ -54,7 +54,7 @@
   .tok{font-family:var(--font-m); font-size:12px; background:var(--bg-card); border:1px solid var(--line); border-radius:6px; padding:6px 10px; transition:all .3s ease; color:var(--text-dim);}
   .tok.prompt-active{border-color:var(--teal); color:var(--teal); box-shadow:0 0 0 1px var(--teal) inset;}
   .tok.gen{border-color:var(--accent-dim); color:var(--accent);}
-  .tok.gen-active{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; background:rgba(232,163,85,0.1);}
+  .tok.gen-active{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; background:rgba(154,116,44,0.12);}
 
   .layer-track{margin-top:auto; padding-top:16px;}
   .layer-label{font-family:var(--font-m); font-size:11px; color:var(--text-faint); display:flex; justify-content:space-between; margin-bottom:6px;}
@@ -64,8 +64,8 @@
   .layer-bar.decode-fill{background:linear-gradient(90deg,var(--accent-dim),var(--accent));}
 
   .controls{display:flex; gap:10px; margin-top:20px;}
-  button.step-btn{font-family:var(--font-m); background:var(--accent); color:#1a1206; border:none; padding:10px 20px; border-radius:8px; font-size:12.5px; font-weight:700; cursor:pointer;}
-  button.step-btn:hover{background:#f0b46e;}
+  button.step-btn{font-family:var(--font-m); background:var(--accent); color:#fffdf8; border:none; padding:10px 20px; border-radius:8px; font-size:12.5px; font-weight:700; cursor:pointer;}
+  button.step-btn:hover{background:#b98f42;}
   button.step-btn:disabled{opacity:.4; cursor:default;}
   button.step-btn.secondary{background:transparent; border:1px solid var(--line); color:var(--text-dim);}
 
@@ -90,7 +90,7 @@
   .hc-label{font-family:var(--font-m); font-size:10.5px; color:var(--text-faint); text-transform:uppercase; display:flex; justify-content:space-between; margin-bottom:5px;}
   .hc-bar-bg{height:14px; background:var(--bg-panel); border:1px solid var(--line); border-radius:4px; overflow:hidden;}
   .hc-bar{height:100%; border-radius:3px; transition:width .4s ease;}
-  .hc-bar.weights{background:linear-gradient(90deg,#3d4a52,#5c8a91); width:100%;}
+  .hc-bar.weights{background:linear-gradient(90deg,#d8e0e0,#2f7376); width:100%;}
   .hc-bar.kv{background:linear-gradient(90deg,var(--accent-dim),var(--accent)); width:2%;}
 
   .stats{background:var(--bg-card); border:1px solid var(--line); border-radius:12px; padding:16px; display:grid; grid-template-columns:1fr 1fr; gap:12px;}
@@ -122,7 +122,7 @@
 <div class="wrap">
   <header class="hero">
     <div class="eyebrow">Fully traced, one real prompt</div>
-    <h1>A 7B model answers <em>"The capital of France is"</em> — every hop, HBM to CUDA core.</h1>
+    <h1>A 7B model answers <em>"The capital of France is"</em> - every hop, HBM to CUDA core.</h1>
     <p class="lede">Same prompt, start to finish: tokenize → embed → 32 transformer layers → sample a token, then loop. Watch what moves, what gets reused, and why the two phases feel so different to the hardware.</p>
     <div class="specs">
       <span class="spec-chip">d_model = 4096</span>
@@ -156,7 +156,7 @@
 
       <div class="stage-right">
         <div class="hierarchy">
-          <div class="h-title">Memory hierarchy — active hop glows</div>
+          <div class="h-title">Memory hierarchy - active hop glows</div>
           <div class="h-tier" id="tier-hbm">HBM (VRAM) <span class="hsz">~80GB</span></div>
           <div class="h-tier" id="tier-l2">L2 Cache <span class="hsz">~50MB</span></div>
           <div class="h-tier" id="tier-l1">L1 / Shared Mem <span class="hsz">~192KB</span></div>
@@ -179,8 +179,8 @@
         <div class="stats">
           <div class="stat"><div class="sl">HBM weight fetches</div><div class="sv" id="statFetches">0</div></div>
           <div class="stat"><div class="sl">Tokens produced</div><div class="sv" id="statTokens">0</div></div>
-          <div class="stat"><div class="sl">Reuse this phase</div><div class="sv" id="statReuse">—</div></div>
-          <div class="stat"><div class="sl">Regime</div><div class="sv" id="statRegime">—</div></div>
+          <div class="stat"><div class="sl">Reuse this phase</div><div class="sv" id="statReuse">-</div></div>
+          <div class="stat"><div class="sl">Regime</div><div class="sv" id="statRegime">-</div></div>
         </div>
       </div>
     </div>
@@ -201,7 +201,7 @@
     </div>
   </main>
 
-  <footer>d_model=4096, 32 layers, ≈14GB fp16 weights — illustrative numbers modeled loosely on a 7B-class model</footer>
+  <footer>d_model=4096, 32 layers, ≈14GB fp16 weights - illustrative numbers modeled loosely on a 7B-class model</footer>
 </div>
 
 <script>
@@ -294,52 +294,52 @@
       phaseBadge.className='phase-badge prefill'; phaseText.textContent='Idle';
       stepTitle.textContent = 'The prompt arrives';
       stepText.innerHTML = 'Your text: <b>"The capital of France is"</b>. Before anything touches the GPU\'s memory hierarchy, it has to become numbers.';
-      renderTokens(false,-1); refreshStats('—','—');
+      renderTokens(false,-1); refreshStats('-','-');
     },
-    // 1 — tokenize
+    // 1 - tokenize
     async ()=>{
       phaseText.textContent='Tokenize';
-      stepTitle.textContent = 'Step 1 — Tokenize';
-      stepText.innerHTML = 'The tokenizer splits the prompt into <b>5 tokens</b>. Each token is just an integer ID right now — no vectors yet.';
+      stepTitle.textContent = 'Step 1 - Tokenize';
+      stepText.innerHTML = 'The tokenizer splits the prompt into <b>5 tokens</b>. Each token is just an integer ID right now - no vectors yet.';
       renderTokens(true,-1);
     },
-    // 2 — embedding lookup
+    // 2 - embedding lookup
     async ()=>{
-      stepTitle.textContent = 'Step 2 — Embedding lookup';
+      stepTitle.textContent = 'Step 2 - Embedding lookup';
       stepText.innerHTML = 'Each token ID looks up its row in the <b>embedding table</b>, which lives in HBM alongside every other weight. 5 tokens → 5 rows fetched → a matrix <span class="mono">X (5 × 4096)</span>.';
       litTier('tier-hbm', true); await wait(300);
       litTier('tier-core', true); await wait(200);
       litTier(null);
     },
-    // 3 — prefill layer loop
+    // 3 - prefill layer loop
     async ()=>{
       phaseBadge.className='phase-badge prefill'; phaseText.textContent='PREFILL';
-      stepTitle.textContent = 'Step 3 — Prefill: all 32 layers, all 5 tokens together';
+      stepTitle.textContent = 'Step 3 - Prefill: all 32 layers, all 5 tokens together';
       stepText.innerHTML = 'For every layer: <span class="teal-b">Q/K/V weights</span> stream HBM → L2 → L1 → registers → <b>Tensor Cores</b> <i>once</i>, then get reused for all 5 tokens before eviction. K/V for each token get written into the KV cache. Watch the layer counter climb.';
       renderTokens(true,-1);
       await animateLayerLoop(32, '5 tokens / fetch', true, (L)=>{ kvTokens = Math.round((L/32)*5); refreshStats('5 tokens / fetch','compute-bound'); });
     },
-    // 4 — sample first token
+    // 4 - sample first token
     async ()=>{
-      stepTitle.textContent = 'Step 4 — LM head → sample';
-      stepText.innerHTML = 'After the last layer, a final projection (weights → vocabulary size) turns the last token\'s vector into probabilities. Highest probability: <b class="accent-b">"Paris"</b>. Prefill is done — <b>32 weight fetches</b> just served <b>5 tokens</b> of computation.';
+      stepTitle.textContent = 'Step 4 - LM head → sample';
+      stepText.innerHTML = 'After the last layer, a final projection (weights → vocabulary size) turns the last token\'s vector into probabilities. Highest probability: <b class="accent-b">"Paris"</b>. Prefill is done - <b>32 weight fetches</b> just served <b>5 tokens</b> of computation.';
       tokensProduced = 1; kvTokens = 5;
       renderTokens(true,0);
       refreshStats('5 tokens / fetch','compute-bound');
     },
-    // 5 — decode step 1
+    // 5 - decode step 1
     async ()=>{
-      phaseBadge.className='phase-badge decode'; phaseText.textContent='DECODE — step 1';
-      stepTitle.textContent = 'Step 5 — Decode: generate token 2';
-      stepText.innerHTML = 'Only <b>"Paris"</b> needs processing now — but every layer\'s weights still have to make the <span class="accent-b">full trip from HBM</span>, just to serve this one token. Attention also reads the KV cache built during prefill.';
+      phaseBadge.className='phase-badge decode'; phaseText.textContent='DECODE - step 1';
+      stepTitle.textContent = 'Step 5 - Decode: generate token 2';
+      stepText.innerHTML = 'Only <b>"Paris"</b> needs processing now - but every layer\'s weights still have to make the <span class="accent-b">full trip from HBM</span>, just to serve this one token. Attention also reads the KV cache built during prefill.';
       renderTokens(false,0);
       await animateLayerLoop(32, '1 token / fetch', false, (L)=>{});
       kvTokens = 6; tokensProduced = 1;
       refreshStats('1 token / fetch','memory-bound');
     },
-    // 6 — sample token 2, decode step for it
+    // 6 - sample token 2, decode step for it
     async ()=>{
-      stepTitle.textContent = 'Step 6 — Sample, then repeat for token 3';
+      stepTitle.textContent = 'Step 6 - Sample, then repeat for token 3';
       stepText.innerHTML = 'Next token sampled: <b class="accent-b">","</b>. Same story again: 32 fresh weight fetches, this time to produce one comma. KV cache keeps growing.';
       tokensProduced = 2;
       renderTokens(false,1);
@@ -347,9 +347,9 @@
       kvTokens = 7;
       refreshStats('1 token / fetch','memory-bound');
     },
-    // 7 — decode step 3
+    // 7 - decode step 3
     async ()=>{
-      stepTitle.textContent = 'Step 7 — One more time, for "a"';
+      stepTitle.textContent = 'Step 7 - One more time, for "a"';
       stepText.innerHTML = 'Sampled: <b class="accent-b">"a"</b>. Same 32-layer, full-weight-reload cycle, for one more single token.';
       tokensProduced = 3;
       renderTokens(false,2);
@@ -357,11 +357,11 @@
       kvTokens = 8;
       refreshStats('1 token / fetch','memory-bound');
     },
-    // 8 — summary
+    // 8 - summary
     async ()=>{
       phaseText.textContent='Done';
-      stepTitle.textContent = 'Step 8 — What just happened';
-      stepText.innerHTML = 'Prefill: <b class="teal-b">32 fetches → 5 tokens</b> (6.4 fetches/token). Decode: <b class="accent-b">96 fetches → 3 tokens</b> (32 fetches/token) — <b>5× worse</b>, exactly matching the 5-token batch size prefill got to amortize across. This is the whole memory-bound story, traced end to end.';
+      stepTitle.textContent = 'Step 8 - What just happened';
+      stepText.innerHTML = 'Prefill: <b class="teal-b">32 fetches → 5 tokens</b> (6.4 fetches/token). Decode: <b class="accent-b">96 fetches → 3 tokens</b> (32 fetches/token) - <b>5× worse</b>, exactly matching the 5-token batch size prefill got to amortize across. This is the whole memory-bound story, traced end to end.';
       litTier(null);
       summarySection.style.display = 'grid';
       await wait(150);

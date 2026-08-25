@@ -8,19 +8,19 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg: #0a0d12;
-    --bg-raised: #12161f;
-    --bg-card: #161b26;
-    --line: #262e3d;
-    --line-soft: #1c2230;
-    --text: #e7eaf1;
-    --text-dim: #8b93a7;
-    --text-faint: #5a6376;
-    --copper: #e8a355;
-    --copper-dim: #7a5a34;
-    --teal: #4fd1c5;
-    --teal-dim: #2a5a56;
-    --violet: #a78bfa;
+    --bg: #fbfaf6;
+    --bg-raised: #fffdf8;
+    --bg-card: #f1ebe2;
+    --line: #ddd5ca;
+    --line-soft: #e7dfd1;
+    --text: #181714;
+    --text-dim: #67615a;
+    --text-faint: #9a948a;
+    --copper: #9a742c;
+    --copper-dim: #d8c088;
+    --teal: #2f7376;
+    --teal-dim: #a9d0cb;
+    --violet: #64518f;
     --font-display: 'Space Grotesk', sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
     --font-body: 'Inter', sans-serif;
@@ -33,7 +33,7 @@
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
   }
-  ::selection{ background: var(--copper-dim); color: #fff; }
+  ::selection{ background: rgba(154,116,44,0.22); color: var(--text); }
   .wrap{ max-width: 920px; margin: 0 auto; padding: 0 24px; }
 
   /* ---- background texture ---- */
@@ -42,8 +42,8 @@
     background-image:
       linear-gradient(var(--line-soft) 1px, transparent 1px),
       linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
-    background-size: 42px 42px;
-    opacity: 0.35;
+    background-size: 28px 28px;
+    opacity: 0.6;
     mask-image: radial-gradient(ellipse 80% 50% at 50% 0%, black 40%, transparent 90%);
   }
 
@@ -190,7 +190,7 @@
   button.run-btn{
     font-family: var(--font-mono);
     background: var(--copper);
-    color: #1a1206;
+    color: #fffdf8;
     border: none;
     padding: 10px 20px;
     border-radius: 8px;
@@ -200,7 +200,7 @@
     letter-spacing: 0.02em;
     transition: transform 0.15s ease, background 0.15s ease;
   }
-  button.run-btn:hover{ background: #f0b46e; transform: translateY(-1px); }
+  button.run-btn:hover{ background: #b98f42; transform: translateY(-1px); }
   button.run-btn:active{ transform: translateY(0); }
   button.run-btn:disabled{ opacity: 0.45; cursor: default; transform: none; }
 
@@ -234,7 +234,7 @@
     font-family: var(--font-mono);
     font-size: 10px;
     font-weight: 600;
-    color: #0a0d12;
+    color: #fffdf8;
     transition: left 0.6s cubic-bezier(.4,0,.2,1);
     left: 6px;
   }
@@ -244,8 +244,8 @@
     animation: pulse-glow 0.5s ease-in-out infinite alternate;
   }
   @keyframes pulse-glow{
-    from{ box-shadow: 0 0 4px 0 rgba(232,163,85,0.4); }
-    to{ box-shadow: 0 0 14px 4px rgba(232,163,85,0.7); }
+    from{ box-shadow: 0 0 4px 0 rgba(154,116,44,0.35); }
+    to{ box-shadow: 0 0 14px 4px rgba(154,116,44,0.6); }
   }
   .counters{
     margin-top: 22px;
@@ -291,14 +291,14 @@
 <div class="wrap">
   <header class="hero">
     <div class="eyebrow">GPU memory, from the ground up</div>
-    <h1>Your GPU has a <em>tiny desk</em> and a <em>giant warehouse</em> — here's how a 70B model gets computed anyway.</h1>
-    <p class="lede">Math can only happen in <b>registers</b> — a space smaller than a phone's contact list. Everything else, including a 140GB pile of model weights, has to be shipped there in tiny pieces, used, and thrown away to make room for the next piece. This is the entire story.</p>
+    <h1>Your GPU has a <em>tiny desk</em> and a <em>giant warehouse</em> - here's how a 70B model gets computed anyway.</h1>
+    <p class="lede">Math can only happen in <b>registers</b> - a space smaller than a phone's contact list. Everything else, including a 140GB pile of model weights, has to be shipped there in tiny pieces, used, and thrown away to make room for the next piece. This is the entire story.</p>
   </header>
 
   <section id="analogy">
-    <div class="kicker">01 — The four rooms</div>
+    <div class="kicker">01 - The four rooms</div>
     <h2>Think of it as a kitchen, not a warehouse</h2>
-    <p class="body-text">Every GPU chip is really four "rooms" nested inside each other, each one faster and dramatically smaller than the last. Cooking (arithmetic) only happens on the countertop — never in the warehouse.</p>
+    <p class="body-text">Every GPU chip is really four "rooms" nested inside each other, each one faster and dramatically smaller than the last. Cooking (arithmetic) only happens on the countertop - never in the warehouse.</p>
 
     <div class="analogy-grid">
       <div class="analogy-card c-reg">
@@ -323,15 +323,15 @@
         <div class="tag">Slowest, biggest</div>
         <h3>HBM / VRAM</h3>
         <div class="size">~80 GB total</div>
-        <p>The warehouse down the street. Holds everything — all 70B weights — but every trip there is slow.</p>
+        <p>The warehouse down the street. Holds everything - all 70B weights - but every trip there is slow.</p>
       </div>
     </div>
   </section>
 
   <section id="hierarchy">
-    <div class="kicker">02 — To scale (sort of)</div>
+    <div class="kicker">02 - To scale (sort of)</div>
     <h2>The size gap is enormous</h2>
-    <p class="body-text">Bar width below is roughly proportional to capacity. Registers and L1 are so small next to VRAM that at true scale they'd be invisible pixels — that's the entire problem this article is about.</p>
+    <p class="body-text">Bar width below is roughly proportional to capacity. Registers and L1 are so small next to VRAM that at true scale they'd be invisible pixels - that's the entire problem this article is about.</p>
 
     <div class="diagram">
       <div class="tier t-hbm">
@@ -357,14 +357,14 @@
   </section>
 
   <section id="demo">
-    <div class="kicker">03 — Watch it move</div>
-    <h2>Both weights and inputs travel — in small tiles</h2>
+    <div class="kicker">03 - Watch it move</div>
+    <h2>Both weights and inputs travel - in small tiles</h2>
     <p class="body-text">Neither the whole 70B weight matrix nor the whole input ever sits in fast memory. A small <b>tile</b> of each is fetched, multiplied together, reused a few times, then thrown away for the next tile. Press run to watch one tile make the trip.</p>
 
     <div class="demo">
       <div class="demo-head">
         <button class="run-btn" id="runBtn">▶ Run one tile</button>
-        <div class="demo-status" id="status">Idle — press run</div>
+        <div class="demo-status" id="status">Idle - press run</div>
       </div>
 
       <div class="lanes">
@@ -394,20 +394,20 @@
   </section>
 
   <section id="bandwidth">
-    <div class="kicker">04 — Why this matters for a 70B model</div>
+    <div class="kicker">04 - Why this matters for a 70B model</div>
     <h2>The GPU spends most of its time waiting, not computing</h2>
-    <p class="body-text">Generating one token means every one of the 70B weights has to make the HBM → register trip once. That's ~140GB of traffic (fp16) for a tiny amount of actual math per weight. The compute units finish almost instantly and then sit idle waiting for the next byte to arrive — this is why LLM inference is called <b style="color:var(--text)">memory-bandwidth bound</b>, and why shrinking the weights (quantization) speeds things up more than making the chip do more FLOPs.</p>
+    <p class="body-text">Generating one token means every one of the 70B weights has to make the HBM → register trip once. That's ~140GB of traffic (fp16) for a tiny amount of actual math per weight. The compute units finish almost instantly and then sit idle waiting for the next byte to arrive - this is why LLM inference is called <b style="color:var(--text)">memory-bandwidth bound</b>, and why shrinking the weights (quantization) speeds things up more than making the chip do more FLOPs.</p>
 
     <div class="bw-compare">
       <div class="bw-row">
         <div class="blabel">Moving weights</div>
         <div class="bw-bar-bg"><div class="bw-bar weights" id="barWeights"></div></div>
-        <div class="bval" id="valWeights">— ms</div>
+        <div class="bval" id="valWeights">- ms</div>
       </div>
       <div class="bw-row">
         <div class="blabel">Doing the math</div>
         <div class="bw-bar-bg"><div class="bw-bar compute" id="barCompute"></div></div>
-        <div class="bval" id="valCompute">— ms</div>
+        <div class="bval" id="valCompute">- ms</div>
       </div>
     </div>
   </section>
@@ -450,24 +450,24 @@
     await wait(700);
 
     clearActive(); lanes.l2.classList.add('active');
-    status.textContent = 'Landed in L2 — shared pantry for the whole chip…';
+    status.textContent = 'Landed in L2 - shared pantry for the whole chip…';
     placeIn(lanes.l2, 6, 46);
     await wait(650);
 
     clearActive(); lanes.l1.classList.add('active');
-    status.textContent = 'Staged in L1 / shared memory — prepping on the cutting board…';
+    status.textContent = 'Staged in L1 / shared memory - prepping on the cutting board…';
     placeIn(lanes.l1, 6, 46);
     await wait(650);
 
     clearActive(); lanes.reg.classList.add('active');
-    status.textContent = 'In registers — math can finally happen.';
+    status.textContent = 'In registers - math can finally happen.';
     placeIn(lanes.reg, 6, 46);
     await wait(500);
 
     chipW.classList.add('pulse'); chipX.classList.add('pulse');
     for(let i=0;i<4;i++){
       reuse++; cReuse.textContent = reuse;
-      status.textContent = `Multiply-accumulate #${reuse} — reusing the same tile before it's evicted…`;
+      status.textContent = `Multiply-accumulate #${reuse} - reusing the same tile before it's evicted…`;
       await wait(420);
     }
     chipW.classList.remove('pulse'); chipX.classList.remove('pulse');

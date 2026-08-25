@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ATTN-6×4 — Attention Mechanics &amp; GPU Execution</title>
+<title>ATTN-6×4 - Attention Mechanics &amp; GPU Execution</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,21 +15,21 @@
 
 <style>
   :root{
-    --bg: #0a1420;
-    --bg-panel: #0d1b28;
-    --bg-panel-2: #0f2130;
-    --line: rgba(120,180,200,0.16);
-    --line-strong: rgba(130,200,215,0.32);
-    --grid: rgba(94,234,212,0.055);
-    --cyan: #5eead4;
-    --cyan-bright: #9dfff0;
-    --cyan-dim: #2a5a54;
-    --amber: #ffb454;
-    --amber-dim: #7a5a2e;
-    --text: #dbe8ef;
-    --text-dim: #7f97a6;
-    --text-faint: #4d6472;
-    --white: #f4fafc;
+    --bg: #fbfaf6;
+    --bg-panel: #fffdf8;
+    --bg-panel-2: #f1ebe2;
+    --line: rgba(24,23,20,0.14);
+    --line-strong: rgba(24,23,20,0.30);
+    --grid: rgba(24,23,20,0.035);
+    --cyan: #2f7376;
+    --cyan-bright: #1a4d4f;
+    --cyan-dim: #7fb0a8;
+    --amber: #9a742c;
+    --amber-dim: #c9a860;
+    --text: #181714;
+    --text-dim: #67615a;
+    --text-faint: #9a948a;
+    --white: #0f0e0c;
     --mono: 'IBM Plex Mono', ui-monospace, monospace;
     --sans: 'IBM Plex Sans', -apple-system, sans-serif;
     --cond: 'IBM Plex Sans Condensed', var(--sans);
@@ -41,9 +41,8 @@
 
   body{
     background:
-      linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 100% 32px,
-      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 32px 100%,
-      radial-gradient(ellipse 1200px 700px at 50% -10%, #10283a 0%, var(--bg) 55%),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 28px 100%,
+      linear-gradient(180deg, var(--grid) 1px, transparent 1px) 0 0 / 100% 28px,
       var(--bg);
     color: var(--text);
     font-family: var(--sans);
@@ -108,7 +107,7 @@
   header.masthead::before{
     content:'';
     position:absolute; inset: 6px;
-    border: 1px solid rgba(94,234,212,0.14);
+    border: 1px solid rgba(47,115,118,0.18);
     pointer-events:none;
   }
   .doc-id-row{
@@ -192,7 +191,7 @@
     letter-spacing: 0.08em;
     border: 1px solid var(--amber-dim);
     padding: 2px 8px;
-    background: rgba(255,180,84,0.06);
+    background: rgba(154,116,44,0.09);
   }
   .sec-head h2{
     font-family: var(--sans);
@@ -294,7 +293,7 @@
   /* ---------- EQUATIONS ---------- */
   .eq-block{
     border-left: 2px solid var(--cyan-dim);
-    background: rgba(94,234,212,0.035);
+    background: rgba(47,115,118,0.05);
     margin: 16px 0;
     padding: 14px 18px;
     overflow-x: auto;
@@ -361,7 +360,7 @@
     font-weight: 500;
   }
   .ratings tbody th{
-    background: rgba(94,234,212,0.03);
+    background: rgba(47,115,118,0.045);
     color: var(--cyan);
     font-weight: 600;
     white-space: nowrap;
@@ -369,7 +368,7 @@
   .ratings td{ color: var(--text); }
   .ratings td.compute{ color: var(--cyan-bright); }
   .ratings td.mem{ color: var(--amber); }
-  .ratings tr:hover td, .ratings tr:hover th{ background: rgba(94,234,212,0.045); }
+  .ratings tr:hover td, .ratings tr:hover th{ background: rgba(47,115,118,0.06); }
 
   .pill{
     display:inline-block;
@@ -384,7 +383,7 @@
   /* ---------- CALLOUT ---------- */
   .callout{
     border: 1px dashed var(--amber-dim);
-    background: rgba(255,180,84,0.045);
+    background: rgba(154,116,44,0.07);
     padding: 16px 18px;
     margin: 22px 0 4px;
     font-size: 14.5px;
@@ -440,7 +439,7 @@
 <body>
 
 <div class="rail left">
-  <span class="stamp">Q·K·V — 6×4 — 4×4</span>
+  <span class="stamp">Q·K·V - 6×4 - 4×4</span>
   <div class="tick"></div>
 </div>
 <div class="rail right">
@@ -456,7 +455,7 @@
       <span class="dim">REV. 2026&#8209;08</span>
     </div>
     <h1 class="title">Attention Mechanics <span class="accent">&amp;</span> GPU Execution</h1>
-    <p class="subtitle">Tracing a single attention block through its matrix shapes, then down through the memory hierarchy — from GEMM-bound prefill to GEMV-bound, bandwidth-starved decode.</p>
+    <p class="subtitle">Tracing a single attention block through its matrix shapes, then down through the memory hierarchy - from GEMM-bound prefill to GEMV-bound, bandwidth-starved decode.</p>
     <div class="spec-strip">
       <div class="cell"><span class="k">Sequence length N</span><span class="v">6</span></div>
       <div class="cell"><span class="k">Embedding dim d</span><span class="v">4</span></div>
@@ -477,11 +476,11 @@
     <div class="spec-table">
       <div class="spec-row">
         <div class="label">Input Matrix (X)</div>
-        <div class="val"><span class="shape">6 × 4</span> — 6 tokens, each a 4‑dimensional vector.</div>
+        <div class="val"><span class="shape">6 × 4</span> - 6 tokens, each a 4‑dimensional vector.</div>
       </div>
       <div class="spec-row">
         <div class="label">Projection Weights</div>
-        <div class="val"><span class="shape">4 × 4</span> — W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub>, one matrix per projection.</div>
+        <div class="val"><span class="shape">4 × 4</span> - W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub>, one matrix per projection.</div>
       </div>
     </div>
   </section>
@@ -490,13 +489,13 @@
   <section class="block" id="prefill">
     <div class="sec-head">
       <span class="sec-num">02</span>
-      <h2>Phase 1 — Prefill</h2>
+      <h2>Phase 1 - Prefill</h2>
       <span class="sec-tag">Prompt processing</span>
     </div>
     <p class="prose">The entire prompt is processed in one shot. Every token's query, key, and value vector is produced by the same batched matrix multiply, and every token attends to every other token simultaneously.</p>
 
     <div class="diagram-panel">
-      <span class="cap">Fig 1 — Prefill dataflow</span>
+      <span class="cap">Fig 1 - Prefill dataflow</span>
       <svg viewBox="0 0 760 430" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <marker id="arrow1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
@@ -568,7 +567,7 @@
     </div>
     <div class="eq-block">
       $$S = QK^{\mathsf T} \;\rightarrow\; (6\times4)\times(4\times6) = 6\times6$$
-      <div class="eq-note">Cell (i, j) — how much token i attends to token j.</div>
+      <div class="eq-note">Cell (i, j) - how much token i attends to token j.</div>
     </div>
     <div class="eq-block">
       $$A = \mathrm{Softmax}\!\left(\frac{S}{\sqrt d}\right) \quad (6\times6), \qquad \mathrm{Output} = AV \;\rightarrow\; (6\times6)\times(6\times4) = 6\times4$$
@@ -586,7 +585,7 @@
     <p class="prose">A modern GPU packs dozens of <b>Streaming Multiprocessors (SMs)</b>, each with its own shared memory / L1 cache, warp schedulers, CUDA cores, and Tensor Cores.</p>
 
     <div class="diagram-panel">
-      <span class="cap">Fig 2 — Memory hierarchy → SM tiling</span>
+      <span class="cap">Fig 2 - Memory hierarchy → SM tiling</span>
       <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <marker id="arrow2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
@@ -609,8 +608,8 @@
 
         <!-- SM 0 -->
         <rect x="120" y="152" width="280" height="132" class="node-box"></rect>
-        <text x="260" y="174" text-anchor="middle" class="node-label" font-size="12.5">Streaming Multiproc. — SM 0</text>
-        <rect x="145" y="188" width="230" height="30" class="node-box" fill="rgba(94,234,212,0.05)"></rect>
+        <text x="260" y="174" text-anchor="middle" class="node-label" font-size="12.5">Streaming Multiproc. - SM 0</text>
+        <rect x="145" y="188" width="230" height="30" class="node-box" fill="rgba(47,115,118,0.08)"></rect>
         <text x="260" y="207" text-anchor="middle" class="node-label" font-size="11.5">Shared Mem / L1</text>
         <line x1="260" y1="218" x2="260" y2="234" class="flow-line" marker-end="url(#arrow2)"></line>
         <rect x="145" y="236" width="230" height="34" class="node-box warn"></rect>
@@ -620,7 +619,7 @@
         <!-- SM 1 -->
         <rect x="420" y="152" width="220" height="132" class="node-box"></rect>
         <text x="530" y="174" text-anchor="middle" class="node-label" font-size="12.5">SM 1</text>
-        <rect x="440" y="188" width="180" height="30" class="node-box" fill="rgba(94,234,212,0.05)"></rect>
+        <rect x="440" y="188" width="180" height="30" class="node-box" fill="rgba(47,115,118,0.08)"></rect>
         <text x="530" y="207" text-anchor="middle" class="node-label" font-size="11.5">Shared Mem / L1</text>
         <line x1="530" y1="218" x2="530" y2="234" class="flow-line" marker-end="url(#arrow2)"></line>
         <rect x="440" y="236" width="180" height="34" class="node-box warn"></rect>
@@ -632,10 +631,10 @@
     </div>
 
     <ul class="note-list">
-      <li><span><b>Tiling &amp; thread blocks</b> — the 6×4 and 4×4 operations split into 2D tiles; thread blocks land on different SMs across the chip.</span></li>
-      <li><span><b>True hardware concurrency</b> — separate SMs execute arithmetic on separate matrix tiles in the same clock cycles.</span></li>
-      <li><span><b>Tensor Core utilization</b> — MMA instructions load sub-matrices straight into Tensor Core registers to run dot products in parallel.</span></li>
-      <li><span><b>Execution profile: compute-bound</b> — the 6×4×4 matrix–matrix multiplies carry high arithmetic intensity, keeping Tensor Cores saturated.</span></li>
+      <li><span><b>Tiling &amp; thread blocks</b> - the 6×4 and 4×4 operations split into 2D tiles; thread blocks land on different SMs across the chip.</span></li>
+      <li><span><b>True hardware concurrency</b> - separate SMs execute arithmetic on separate matrix tiles in the same clock cycles.</span></li>
+      <li><span><b>Tensor Core utilization</b> - MMA instructions load sub-matrices straight into Tensor Core registers to run dot products in parallel.</span></li>
+      <li><span><b>Execution profile: compute-bound</b> - the 6×4×4 matrix–matrix multiplies carry high arithmetic intensity, keeping Tensor Cores saturated.</span></li>
     </ul>
   </section>
 
@@ -643,13 +642,13 @@
   <section class="block" id="decode">
     <div class="sec-head">
       <span class="sec-num">04</span>
-      <h2>Phase 2 — Autoregressive Decode</h2>
+      <h2>Phase 2 - Autoregressive Decode</h2>
       <span class="sec-tag">Generating token #7</span>
     </div>
-    <p class="prose">Once prefill finishes, generation turns sequential. To produce token #7, only the newly generated token needs projecting — everything before it is already sitting in the KV cache.</p>
+    <p class="prose">Once prefill finishes, generation turns sequential. To produce token #7, only the newly generated token needs projecting - everything before it is already sitting in the KV cache.</p>
 
     <div class="diagram-panel">
-      <span class="cap">Fig 3 — Decode-step dataflow</span>
+      <span class="cap">Fig 3 - Decode-step dataflow</span>
       <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <marker id="arrow3" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
@@ -718,7 +717,7 @@
 
     <div class="callout">
       <span class="cap">Why decode feels slow</span>
-      Every single generated token drags the full weight matrices and the entire KV cache across the memory bus — for one row of arithmetic. Low arithmetic intensity per byte moved is the whole story.
+      Every single generated token drags the full weight matrices and the entire KV cache across the memory bus - for one row of arithmetic. Low arithmetic intensity per byte moved is the whole story.
     </div>
   </section>
 
@@ -731,7 +730,7 @@
     </div>
 
     <table class="ratings">
-      <caption>Table 1 — per-phase execution characteristics</caption>
+      <caption>Table 1 - per-phase execution characteristics</caption>
       <thead>
         <tr>
           <th>Attribute</th>
@@ -763,7 +762,7 @@
         <tr>
           <th scope="row">SM state</th>
           <td>High Tensor Core occupancy</td>
-          <td>Low occupancy — cores stall on weight loads</td>
+          <td>Low occupancy - cores stall on weight loads</td>
         </tr>
       </tbody>
     </table>

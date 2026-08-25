@@ -12,20 +12,20 @@
 
     <style>
         :root {
-            --bg-primary: #0d1117;
-            --bg-secondary: #161b22;
-            --bg-tertiary: #21262d;
-            --text-primary: #e6edf3;
-            --text-secondary: #8b949e;
-            --text-muted: #6e7681;
-            --accent-blue: #58a6ff;
-            --accent-purple: #bc8cff;
-            --accent-green: #3fb950;
-            --accent-amber: #d29922;
-            --accent-red: #f85149;
-            --border-color: #30363d;
-            --code-bg: #0b0e14;
-            --card-hover: #1c2128;
+            --bg-primary: #fbfaf6;
+            --bg-secondary: #fffdf8;
+            --bg-tertiary: #f1ebe2;
+            --text-primary: #181714;
+            --text-secondary: #67615a;
+            --text-muted: #9a948a;
+            --accent-blue: #2f5f91;
+            --accent-purple: #64518f;
+            --accent-green: #30745d;
+            --accent-amber: #9a742c;
+            --accent-red: #9b4b3d;
+            --border-color: #ddd5ca;
+            --code-bg: #f1ebe2;
+            --card-hover: #ece5d8;
         }
 
         * {
@@ -57,19 +57,19 @@
         .badge {
             display: inline-block;
             padding: 4px 12px;
-            background: rgba(88, 166, 255, 0.15);
+            background: rgba(47, 95, 145, 0.15);
             color: var(--accent-blue);
             border-radius: 20px;
             font-size: 13px;
             font-weight: 600;
             margin-bottom: 16px;
-            border: 1px solid rgba(88, 166, 255, 0.3);
+            border: 1px solid rgba(47, 95, 145, 0.3);
         }
 
         h1 {
             font-size: 2.5rem;
             line-height: 1.25;
-            color: #ffffff;
+            color: #181714;
             margin-bottom: 16px;
             letter-spacing: -0.02em;
         }
@@ -89,7 +89,7 @@
 
         h2 {
             font-size: 1.75rem;
-            color: #ffffff;
+            color: #181714;
             margin: 44px 0 18px 0;
             border-left: 4px solid var(--accent-blue);
             padding-left: 14px;
@@ -118,7 +118,7 @@
         }
 
         strong {
-            color: #ffffff;
+            color: #181714;
         }
 
         code {
@@ -139,7 +139,7 @@
             padding: 16px 20px;
             margin: 20px 0;
             text-align: center;
-            color: #ffffff;
+            color: #181714;
             overflow-x: auto;
         }
 
@@ -160,7 +160,7 @@
 
         .callout {
             border-left: 4px solid var(--accent-amber);
-            background: rgba(210, 153, 34, 0.1);
+            background: rgba(154, 116, 44, 0.1);
             padding: 16px 20px;
             border-radius: 0 8px 8px 0;
             margin: 20px 0;
@@ -168,12 +168,12 @@
 
         .callout-success {
             border-left: 4px solid var(--accent-green);
-            background: rgba(63, 185, 80, 0.1);
+            background: rgba(48, 116, 93, 0.1);
         }
 
         .callout-title {
             font-weight: 700;
-            color: #ffffff;
+            color: #181714;
             margin-bottom: 6px;
         }
 
@@ -210,16 +210,16 @@
 
         th {
             background-color: var(--bg-tertiary);
-            color: #ffffff;
+            color: #181714;
             font-weight: 600;
         }
 
         tr:nth-child(even) {
-            background-color: rgba(255, 255, 255, 0.02);
+            background-color: rgba(24, 23, 20, 0.025);
         }
 
         tr:hover {
-            background-color: rgba(255, 255, 255, 0.04);
+            background-color: rgba(24, 23, 20, 0.05);
         }
 
         .highlight-green { color: var(--accent-green); font-weight: 600; }
@@ -281,14 +281,14 @@
     <div class="diagram-container">
         <svg viewBox="0 0 800 260" width="100%" height="260" xmlns="http://www.w3.org/2000/svg">
             <style>
-                .box-q { fill: #1f6feb; stroke: #58a6ff; stroke-width: 1.5; rx: 4; }
-                .box-k { fill: #238636; stroke: #3fb950; stroke-width: 1.5; rx: 4; }
-                .box-v { fill: #8957e5; stroke: #bc8cff; stroke-width: 1.5; rx: 4; }
-                .box-l { fill: #d29922; stroke: #e3b341; stroke-width: 1.5; rx: 4; }
+                .box-q { fill: #3d6fa0; stroke: #1f4060; stroke-width: 1.5; rx: 4; }
+                .box-k { fill: #3f8a5c; stroke: #1f4a30; stroke-width: 1.5; rx: 4; }
+                .box-v { fill: #7a5fa8; stroke: #4a3568; stroke-width: 1.5; rx: 4; }
+                .box-l { fill: #a8823a; stroke: #6b4f1e; stroke-width: 1.5; rx: 4; }
                 .text-label { fill: #ffffff; font-family: sans-serif; font-size: 11px; text-anchor: middle; font-weight: bold; }
-                .title-svg { fill: #e6edf3; font-family: sans-serif; font-size: 13px; text-anchor: middle; font-weight: bold; }
-                .sub-svg { fill: #8b949e; font-family: sans-serif; font-size: 10px; text-anchor: middle; }
-                .conn { stroke: #30363d; stroke-width: 1.5; stroke-dasharray: 2; }
+                .title-svg { fill: #181714; font-family: sans-serif; font-size: 13px; text-anchor: middle; font-weight: bold; }
+                .sub-svg { fill: #67615a; font-family: sans-serif; font-size: 10px; text-anchor: middle; }
+                .conn { stroke: #c9bfa8; stroke-width: 1.5; stroke-dasharray: 2; }
             </style>
 
             <!-- MHA -->
