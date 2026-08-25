@@ -23,8 +23,102 @@
   <div class="index-header">
     <h1>Inference Engineering</h1>
     <div class="subtitle">A running notebook on how LLMs actually work under the hood.</div>
-    <div class="meta count">3 posts · updated August 2026</div>
+    <div class="meta count">14 posts · updated August 2026</div>
   </div>
+
+  <a class="post-card" href="demystifying-standard-attentionvs-flash-attention-memory-traffic.html">
+    <h3>Memory traffic in attention: standard vs. FlashAttention</h3>
+    <p class="desc">HBM vs. SRAM, IO-awareness, and the math behind FlashAttention's O(N²d²/M) memory footprint — why kernel fusion beats a faster GPU for attention specifically.</p>
+    <div class="tags">
+      <span class="tag">attention</span>
+      <span class="tag">FlashAttention</span>
+      <span class="tag">memory</span>
+      <span class="tag level">advanced</span>
+    </div>
+  </a>
+
+  <a class="post-card" href="Demystifying_Prefill_FLOPs_Causal_MHA_vs_Sliding_Window_Attention.html">
+    <h3>Demystifying attention FLOPs: MHA vs. sliding window attention</h3>
+    <p class="desc">Why prefill's compute cost explodes with context length under full causal attention, and how sliding-window attention flattens that curve.</p>
+    <div class="tags">
+      <span class="tag">attention</span>
+      <span class="tag">FLOPs</span>
+      <span class="tag">prefill</span>
+      <span class="tag level">intermediate</span>
+    </div>
+  </a>
+
+  <a class="post-card" href="attention-mha-mqa-gqa-mla.html">
+    <h3>From MHA to MQA, GQA, and DeepSeek's MLA</h3>
+    <p class="desc">The three answers to "how do we keep KV cache's speed without its memory bill" — from sharing heads to DeepSeek's latent compression trick, worked through the math.</p>
+    <div class="tags">
+      <span class="tag">attention</span>
+      <span class="tag">KV cache</span>
+      <span class="tag">MLA</span>
+      <span class="tag level">advanced</span>
+    </div>
+  </a>
+
+  <a class="post-card" href="know-your-gpu.html">
+    <h3>Know your GPU, from a single core to a full kernel launch</h3>
+    <p class="desc">One continuous walk: why GPUs look the way they do, how the chip is organized, what a kernel actually is, and what's inside one SM — click through the diagrams.</p>
+    <div class="tags">
+      <span class="tag">GPU</span>
+      <span class="tag">kernels</span>
+      <span class="tag level">beginner</span>
+    </div>
+  </a>
+
+  <a class="post-card" href="gpu-memory-hierarchy.html">
+    <h3>How a GPU actually moves data</h3>
+    <p class="desc">Registers, shared memory, L2, HBM — how a GPU's four nested "rooms" get a 70B model's weights to the compute units without drowning in latency.</p>
+    <div class="tags">
+      <span class="tag">GPU</span>
+      <span class="tag">memory hierarchy</span>
+      <span class="tag level">beginner</span>
+    </div>
+  </a>
+
+  <a class="post-card" href="matmul-flops-bytes-notes.html">
+    <h3>FLOPs, bytes, and why batching matters</h3>
+    <p class="desc">A tiny worked matmul example followed all the way through: multiplications counted, bytes moved from HBM, and what the ratio says about compute- vs memory-bound.</p>
+    <div class="tags">
+      <span class="tag">FLOPs</span>
+      <span class="tag">arithmetic intensity</span>
+      <span class="tag level">beginner</span>
+    </div>
+  </a>
+
+  <a class="post-card" href="attention-mechanics-gpu.html">
+    <h3>Attention mechanics &amp; GPU execution</h3>
+    <p class="desc">Tracing a single attention block through its matrix shapes, then down through the memory hierarchy — from GEMM-bound prefill to GEMV-bound, bandwidth-starved decode.</p>
+    <div class="tags">
+      <span class="tag">attention</span>
+      <span class="tag">GPU</span>
+      <span class="tag level">intermediate</span>
+    </div>
+  </a>
+
+  <a class="post-card" href="attention_gpu_interactive.html">
+    <h3>Attention mechanics &amp; GPU execution — interactive</h3>
+    <p class="desc">The click-through companion to the attention mechanics post — walk the same matrix shapes and memory hierarchy one step at a time.</p>
+    <div class="tags">
+      <span class="tag">attention</span>
+      <span class="tag">GPU</span>
+      <span class="tag">interactive</span>
+      <span class="tag level">intermediate</span>
+    </div>
+  </a>
+
+  <a class="post-card" href="multi-head-attention-blog.html">
+    <h3>Multi-head attention, byte by byte, head by head</h3>
+    <p class="desc">A single attention head is one similarity space; language needs many at once. The arithmetic of splitting heads — and splitting them across GPUs.</p>
+    <div class="tags">
+      <span class="tag">attention</span>
+      <span class="tag">multi-head</span>
+      <span class="tag level">intermediate</span>
+    </div>
+  </a>
 
   <a class="post-card" href="kv-cache-good-and-evil.html">
     <h3>The good and evil of KV cache</h3>
@@ -37,7 +131,27 @@
     </div>
   </a>
 
-  <a class="post-card" href="llm-inference-sampling-kv-cache-roofline.html">
+  <a class="post-card" href="prefill-vs-decode.html">
+    <h3>Prefill vs decode, visually</h3>
+    <p class="desc">Same model, same weights, two completely different memory-bound stories — what actually happens to the weight matrix in each phase.</p>
+    <div class="tags">
+      <span class="tag">prefill</span>
+      <span class="tag">decode</span>
+      <span class="tag level">beginner</span>
+    </div>
+  </a>
+
+  <a class="post-card" href="roofline-decode-notes.html">
+    <h3>Why decode is memory-bound, one token at a time</h3>
+    <p class="desc">A walk through the roofline model for LLM inference — why compute units sit idle during decode, and why the fix is chasing the ridge point, not raw FLOPs.</p>
+    <div class="tags">
+      <span class="tag">roofline</span>
+      <span class="tag">decode</span>
+      <span class="tag level">intermediate</span>
+    </div>
+  </a>
+
+  <a class="post-card" href="llm_inference_notes.html">
     <h3>Sampling, KV cache, and the roofline model</h3>
     <p class="desc">Top-k vs top-p sampling explained from first principles, then a walk through why decoding is memory-bound and how batching pushes you across the roofline's ridge point.</p>
     <div class="tags">
@@ -47,11 +161,12 @@
     </div>
   </a>
 
-  <a class="post-card" href="#">
-    <h3>Coming soon — MQA, GQA &amp; MLA</h3>
-    <p class="desc">The three answers to "how do we keep KV cache's speed without its memory bill" — from sharing heads to DeepSeek's latent compression trick.</p>
+  <a class="post-card" href="7b-model-full-trace.html">
+    <h3>A 7B model answers "The capital of France is" — fully traced</h3>
+    <p class="desc">Same prompt, start to finish: tokenize → embed → 32 transformer layers → sample a token, then loop. Watch what moves, and why prefill and decode feel so different to the hardware.</p>
     <div class="tags">
-      <span class="tag">attention</span>
+      <span class="tag">full trace</span>
+      <span class="tag">HBM</span>
       <span class="tag level">advanced</span>
     </div>
   </a>
