@@ -452,7 +452,112 @@
     </section>
 
     <section>
-        <h2>5. Side-by-Side Comparison</h2>
+        <h2>5. FlashAttention in Practice: A Worked Step-by-Step Walkthrough</h2>
+        <p>To see how FlashAttention executes without ever writing large intermediate matrices to High Bandwidth Memory (HBM), let's trace a concrete numerical example.</p>
+        <p>We have a sequence length $N = 16$ and embedding dimension $d = 8$, tiled into blocks of $4 \times 8$:</p>
+        <ul>
+            <li><strong>Queries:</strong> $Q_1, Q_2, Q_3, Q_4 \in \mathbb{R}^{4 \times 8}$</li>
+            <li><strong>Keys:</strong> $K_1, K_2, K_3, K_4 \in \mathbb{R}^{4 \times 8}$</li>
+            <li><strong>Values:</strong> $V_1, V_2, V_3, V_4 \in \mathbb{R}^{4 \times 8}$</li>
+        </ul>
+        <p>We will trace the execution of <strong>Thread Block 1</strong>, which computes the output for the first tile of tokens: $Q_1$.</p>
+
+        <h3>Step 0: Initialization in On-Chip SRAM</h3>
+        <p>Thread Block 1 loads the tile $Q_1$ $(4 \times 8)$ from slow HBM into fast SRAM and allocates three small tracking buffers in SRAM:</p>
+        <ul>
+            <li><strong>Running Maximum ($m$):</strong> Vector of size $4$ initialized to $[-\infty, -\infty, -\infty, -\infty]$. Tracks the max logit seen so far per row for numerical stability.</li>
+            <li><strong>Running Exponential Sum ($\ell$):</strong> Vector of size $4$ initialized to $[0, 0, 0, 0]$. Tracks the denominator of the softmax.</li>
+            <li><strong>Output Accumulator ($O_1$):</strong> Matrix of shape $(4 \times 8)$ initialized to all zeros ($\mathbf{0}$).</li>
+        </ul>
+        <div class="callout">
+            <div class="callout-title">Why this matters</div>
+            <p>These statistics take negligible SRAM memory ($4 + 4 + 32$ floats) and remain entirely on-chip.</p>
+        </div>
+
+        <h3>Step 1: Iteration 1 - Streaming Key/Value Tile 1 ($K_1, V_1$)</h3>
+        <ol>
+            <li><strong>Load $K_1, V_1$ into SRAM:</strong> SRAM now holds $Q_1$, $K_1$, and $V_1$ (each shape $4 \times 8$).</li>
+            <li><strong>Compute Partial Attention Scores:</strong>
+                <div class="math-block">$$S_{11} = \frac{Q_1 K_1^T}{\sqrt{d}} \in \mathbb{R}^{4 \times 4}$$</div>
+                <p><em>Let's trace Row 1 of $S_{11}$. Suppose its scores are:</em></p>
+                <div class="math-block">$$\text{Row 1 scores} = [2.0, 4.0, 1.0, 3.0]$$</div>
+            </li>
+            <li><strong>Update Running Max ($m$):</strong>
+                <ul>
+                    <li>Tile max for Row 1: $\tilde{m}_1 = \max(2.0, 4.0, 1.0, 3.0) = 4.0$</li>
+                    <li>New running max: $m_{\text{new}} = \max(m_{\text{old}}, \tilde{m}_1) = \max(-\infty, 4.0) = 4.0$</li>
+                </ul>
+            </li>
+            <li><strong>Compute Exponentials &amp; Unnormalized Weights:</strong>
+                <div class="math-block">$$P_{11} = \exp(S_{11} - m_{\text{new}}) = [\exp(2 - 4), \exp(4 - 4), \exp(1 - 4), \exp(3 - 4)] = [e^{-2}, e^0, e^{-3}, e^{-1}] \approx [0.135, 1.0, 0.050, 0.368]$$</div>
+            </li>
+            <li><strong>Accumulate into Output &amp; Sum:</strong>
+                <ul>
+                    <li>Tile exponential sum: $\tilde{\ell}_1 = 0.135 + 1.0 + 0.050 + 0.368 = 1.553$</li>
+                    <li>Running sum update: $\ell = \ell_{\text{old}} \cdot e^{m_{\text{old}} - m_{\text{new}}} + \tilde{\ell}_1 = 0 + 1.553 = 1.553$</li>
+                    <li>Output accumulator update:
+                        <div class="math-block">$$O_1 = P_{11} V_1 \quad (\text{shape } 4 \times 8)$$</div>
+                    </li>
+                </ul>
+            </li>
+        </ol>
+
+        <h3>Step 2: Iteration 2 - Streaming Key/Value Tile 2 ($K_2, V_2$)</h3>
+        <p>$K_1$ and $V_1$ are discarded from SRAM. The block loads $K_2$ and $V_2$ into those same memory slots.</p>
+        <ol>
+            <li><strong>Compute New Scores:</strong>
+                <div class="math-block">$$S_{12} = \frac{Q_1 K_2^T}{\sqrt{d}} \in \mathbb{R}^{4 \times 4}$$</div>
+                <p><em>Suppose Row 1 of $S_{12}$ yields higher scores:</em></p>
+                <div class="math-block">$$\text{Row 1 scores} = [5.0, 1.0, 6.0, 2.0]$$</div>
+            </li>
+            <li><strong>Update Running Max ($m$):</strong>
+                <ul>
+                    <li>Tile max for Row 1: $\tilde{m}_2 = \max(5.0, 1.0, 6.0, 2.0) = 6.0$</li>
+                    <li>New running max: $m_{\text{new}} = \max(m_{\text{old}}, \tilde{m}_2) = \max(4.0, 6.0) = 6.0$</li>
+                </ul>
+            </li>
+            <li><strong>Rescale Prior Accumulators (The Core Online Softmax Magic):</strong>
+                <p>Because our maximum increased from $4.0$ to $6.0$, the previous accumulators were scaled by $e^{x - 4.0}$ instead of $e^{x - 6.0}$. We correct them by multiplying by $e^{m_{\text{old}} - m_{\text{new}}} = e^{4.0 - 6.0} = e^{-2} \approx 0.135$:</p>
+                <div class="math-block">$$\ell_{\text{rescaled}} = \ell_{\text{old}} \cdot e^{-2} = 1.553 \cdot 0.135 \approx 0.210$$</div>
+                <div class="math-block">$$O_{1, \text{rescaled}} = O_1 \cdot e^{-2}$$</div>
+            </li>
+            <li><strong>Compute New Exponentials &amp; Add:</strong>
+                <div class="math-block">$$P_{12} = \exp(S_{12} - 6.0) = [e^{-1}, e^{-5}, e^0, e^{-4}] \approx [0.368, 0.007, 1.0, 0.018]$$</div>
+                <div class="math-block">$$\tilde{\ell}_2 = 0.368 + 0.007 + 1.0 + 0.018 = 1.393$$</div>
+                <div class="math-block">$$\ell_{\text{new}} = \ell_{\text{rescaled}} + \tilde{\ell}_2 = 0.210 + 1.393 = 1.603$$</div>
+                <div class="math-block">$$O_1 = O_{1, \text{rescaled}} + P_{12} V_2$$</div>
+            </li>
+        </ol>
+
+        <h3>Step 3: Iterations 3 &amp; 4 - Streaming $(K_3, V_3)$ and $(K_4, V_4)$</h3>
+        <p>The loop repeats identically for the remaining tiles:</p>
+        <ul>
+            <li>Load $(K_3, V_3) \rightarrow$ compute $S_{13} \rightarrow$ update $m \rightarrow$ rescale $O_1, \ell \rightarrow$ accumulate $P_{13} V_3$.</li>
+            <li>Load $(K_4, V_4) \rightarrow$ compute $S_{14} \rightarrow$ update $m \rightarrow$ rescale $O_1, \ell \rightarrow$ accumulate $P_{14} V_4$.</li>
+        </ul>
+
+        <h3>Step 4: Final Normalization &amp; HBM Write</h3>
+        <p>After processing all $4$ key/value tiles, the output accumulator $O_1$ holds the exact unnormalized dot products scaled by the global maximum:</p>
+        <div class="math-block">$$O_1 = \sum_{j=1}^4 e^{S_{1j} - m_{\text{global}}} V_j, \quad \ell = \sum_{j=1}^4 \sum \exp(S_{1j} - m_{\text{global}})$$</div>
+        <ol>
+            <li><strong>Normalize in SRAM:</strong>
+                <div class="math-block">$$O_{1, \text{final}} = \text{diag}(\ell)^{-1} O_1 \quad (\text{divide each row by its scalar } \ell_i)$$</div>
+            </li>
+            <li><strong>Write to HBM:</strong> Thread Block 1 writes $O_{1, \text{final}} \in \mathbb{R}^{4 \times 8}$ directly back to main GPU memory.</li>
+        </ol>
+
+        <div class="callout">
+            <div class="callout-title">Key Takeaways</div>
+            <ul style="margin-bottom: 0;">
+                <li><strong>Zero intermediate $16 \times 16$ allocations:</strong> Only sub-blocks of size $4 \times 4$ exist at any point in time, and only inside registers.</li>
+                <li><strong>Exact mathematical equivalence:</strong> The rescaling factor $e^{m_{\text{old}} - m_{\text{new}}}$ guarantees that the output matches standard attention bit-for-bit without precision loss or numerical overflow.</li>
+                <li><strong>Massive bandwidth savings:</strong> Memory reads/writes drop from $\mathcal{O}(N^2)$ to $\mathcal{O}(N)$, shifting the bottleneck from memory transfer delays to pure Tensor Core computation.</li>
+            </ul>
+        </div>
+    </section>
+
+    <section>
+        <h2>6. Side-by-Side Comparison</h2>
 
         <div class="grid-compare">
             <div class="card card-standard">
@@ -498,7 +603,7 @@
     </section>
 
     <section>
-        <h2>6. Concrete Numerical Example</h2>
+        <h2>7. Concrete Numerical Example</h2>
         <p>Let's calculate the exact memory traffic for a realistic transformer configuration:</p>
         <ul>
             <li>Sequence Length $N = 4096$</li>
