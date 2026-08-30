@@ -309,7 +309,86 @@ Reduction:    ~256× fewer trainable weights per matrix</pre>
       <strong>Safe Initialization:</strong> Matrix <code>A</code> is initialized with Gaussian noise <code>𝒩(0, σ²)</code>, and matrix <code>B</code> is initialized to zeros. At step 0, <code>ΔW = B · A = 0</code>, guaranteeing the model begins training with its exact pre-trained baseline behavior.
     </div>
 
-    <h2>5. Training VRAM vs. Production Serving Realities</h2>
+    <h2>5. Choosing What to Adapt: target_modules in Practice</h2>
+    <p>In both Hugging Face PEFT and Unsloth, the weights that get decomposed are controlled by the <code>target_modules</code> argument. However, their defaults and common conventions differ.</p>
+
+    <h3>Default Behavior Comparison</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Framework</th>
+          <th>Default <code>target_modules</code> (if omitted)</th>
+          <th>What Actually Gets Decomposed</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Hugging Face (PEFT)</strong></td>
+          <td>Model-specific defaults (e.g., <code>["q_proj", "v_proj"]</code> for LLaMA/Mistral)</td>
+          <td>Only Attention Query &amp; Value (<code>W_q</code>, <code>W_v</code>)</td>
+        </tr>
+        <tr>
+          <td><strong>Unsloth</strong></td>
+          <td>Explicitly presets all 7 core linear modules</td>
+          <td>All 4 Attention + 3 MLP layers</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>The 7 Target Modules in Modern LLMs (LLaMA, Mistral, Qwen)</h3>
+    <p>Modern autoregressive models split a Transformer layer into Self-Attention and a SwiGLU Feed-Forward Network (FFN). When decomposing "all linear layers," all 7 of these matrices receive their own independent <code>A</code> and <code>B</code> adapter pairs:</p>
+
+    <p><strong>Self-Attention Projections (4 matrices):</strong></p>
+    <ul>
+      <li><code>q_proj</code> (<code>W_q</code>): Query projection</li>
+      <li><code>k_proj</code> (<code>W_k</code>): Key projection</li>
+      <li><code>v_proj</code> (<code>W_v</code>): Value projection</li>
+      <li><code>o_proj</code> (<code>W_o</code>): Output/dense projection</li>
+    </ul>
+
+    <p><strong>SwiGLU MLP / FFN Projections (3 matrices):</strong></p>
+    <ul>
+      <li><code>gate_proj</code> (<code>W_gate</code>): Computes the gating mechanism <code>SiLU(x W_gate)</code></li>
+      <li><code>up_proj</code> (<code>W_up</code>): Expands the hidden state to intermediate FFN dimension</li>
+      <li><code>down_proj</code> (<code>W_down</code>): Projects the intermediate FFN state back down to <code>d_model</code></li>
+    </ul>
+
+    <h3>How You Configure Them in Code</h3>
+    <p><strong>Hugging Face PEFT (<code>LoraConfig</code>):</strong> to avoid PEFT's minimal <code>W_q</code>, <code>W_v</code> default and target everything:</p>
+    <pre><code>from peft import LoraConfig
+
+# Recommended: target all linear layers automatically
+config = LoraConfig(
+    r=16,
+    lora_alpha=32,
+    target_modules="all-linear",  # Or: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+    lora_dropout=0.05,
+    bias="none",
+    task_type="CAUSAL_LM"
+)</code></pre>
+
+    <p><strong>Unsloth (<code>FastLanguageModel.get_peft_model</code>):</strong> explicitly requires/sets all 7 layers by default for best convergence:</p>
+    <pre><code>model = FastLanguageModel.get_peft_model(
+    model,
+    r=16,
+    target_modules=[
+        "q_proj", "k_proj", "v_proj", "o_proj",
+        "gate_proj", "up_proj", "down_proj",
+    ],
+    lora_alpha=16,
+    lora_dropout=0,  # Optimized to 0 in Unsloth
+    bias="none",
+)</code></pre>
+
+    <h3>What Is Excluded?</h3>
+    <p>Even when using <code>"all-linear"</code>, the following are frozen and not decomposed by default:</p>
+    <ul>
+      <li><strong>Embedding Layer (<code>embed_tokens</code>):</strong> Adapting this consumes massive VRAM because vocab size is huge (e.g., <code>128k × 4096</code>).</li>
+      <li><strong>Language Model Head (<code>lm_head</code>):</strong> Projects final hidden states to vocab logits. Only targeted if adding new tokens or explicitly using <code>modules_to_save=["lm_head", "embed_tokens"]</code>.</li>
+      <li><strong>Normalization Layers (RMSNorm / LayerNorm):</strong> Kept frozen.</li>
+    </ul>
+
+    <h2>6. Training VRAM vs. Production Serving Realities</h2>
     <p>Why do full fine-tunes require over 100 GB of VRAM to train, but only 14 GB to store?</p>
 
     <p>During training with mixed-precision FP16 and AdamW, optimizer overhead scales drastically:</p>
@@ -325,7 +404,7 @@ Reduction:    ~256× fewer trainable weights per matrix</pre>
 
     <p>Once training concludes, optimizer states and gradients are discarded. The saved checkpoint requires only <strong>2 bytes/parameter = 14 GB</strong>.</p>
 
-    <h2>6. Multi-Tenant Serving Architecture</h2>
+    <h2>7. Multi-Tenant Serving Architecture</h2>
     <p>If you maintain 5 separate full-finetune models, you must store and load <code>5 × 14 GB = 70 GB</code> of static checkpoints. Serving them simultaneously requires dedicated GPU allocations for each copy.</p>
 
     <p>With LoRA, the base model stays frozen in VRAM once, and lightweight task adapters (20-50 MB each) are dynamically attached per incoming request:</p>
