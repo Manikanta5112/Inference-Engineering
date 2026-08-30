@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATTN-6×4 - Attention Mechanics &amp; GPU Execution</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+
+<style>
+  :root{
+    --bg: #fbfaf6;
+    --bg-panel: #fffdf8;
+    --bg-panel-2: #f1ebe2;
+    --line: rgba(24,23,20,0.14);
+    --line-strong: rgba(24,23,20,0.30);
+    --grid: rgba(24,23,20,0.035);
+    --cyan: #2f7376;
+    --cyan-bright: #1a4d4f;
+    --cyan-dim: #7fb0a8;
+    --amber: #9a742c;
+    --amber-dim: #c9a860;
+    --text: #181714;
+    --text-dim: #67615a;
+    --text-faint: #9a948a;
+    --white: #0f0e0c;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --sans: 'IBM Plex Sans', -apple-system, sans-serif;
+    --cond: 'IBM Plex Sans Condensed', var(--sans);
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+
+  html{ scroll-behavior:smooth; }
+
+  body{
+    background:
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 28px 100%,
+      linear-gradient(180deg, var(--grid) 1px, transparent 1px) 0 0 / 100% 28px,
+      var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    padding: 0 0 120px;
+  }
+
+  a{ color: var(--cyan); text-decoration: none; }
+
+  ::selection{ background: var(--cyan-dim); color: var(--cyan-bright); }
+
+  .rail{
+    position: fixed;
+    top:0; bottom:0;
+    width: 28px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:space-between;
+    padding: 24px 0;
+    z-index: 5;
+    pointer-events:none;
+  }
+  .rail.left{ left:0; }
+  .rail.right{ right:0; }
+  .rail .tick{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .rail .tick::before{
+    content:'';
+    width:6px; height:1px;
+    background: var(--line-strong);
+  }
+  .rail .stamp{
+    writing-mode: vertical-rl;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    color: var(--text-faint);
+    white-space: nowrap;
+  }
+  .rail.right .stamp{ transform: rotate(180deg); }
+
+  .page{
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 40px;
+  }
+
+  /* ---------- MASTHEAD ---------- */
+  header.masthead{
+    border: 1px solid var(--line-strong);
+    background: linear-gradient(180deg, var(--bg-panel-2), var(--bg-panel));
+    margin: 48px 0 0;
+    padding: 28px 32px 24px;
+    position: relative;
+  }
+  header.masthead::before{
+    content:'';
+    position:absolute; inset: 6px;
+    border: 1px solid rgba(47,115,118,0.18);
+    pointer-events:none;
+  }
+  .doc-id-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--cyan);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .doc-id-row span.dim{ color: var(--text-faint); }
+
+  h1.title{
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: clamp(28px, 5vw, 44px);
+    letter-spacing: -0.01em;
+    color: var(--white);
+    line-height: 1.15;
+    margin-bottom: 10px;
+  }
+  h1.title .accent{ color: var(--cyan); }
+
+  p.subtitle{
+    font-family: var(--cond);
+    font-size: 16px;
+    color: var(--text-dim);
+    max-width: 62ch;
+    margin-bottom: 22px;
+  }
+
+  .spec-strip{
+    display:flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border-top: 1px solid var(--line);
+    margin-top: 4px;
+  }
+  .spec-strip .cell{
+    flex: 1 1 140px;
+    padding: 12px 18px 0;
+    border-right: 1px solid var(--line);
+  }
+  .spec-strip .cell:last-child{ border-right:none; }
+  .spec-strip .cell .k{
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    display:block;
+    margin-bottom: 4px;
+  }
+  .spec-strip .cell .v{
+    font-family: var(--mono);
+    font-size: 18px;
+    color: var(--cyan-bright);
+    font-weight: 600;
+  }
+
+  /* ---------- SECTIONS ---------- */
+  section.block{
+    margin-top: 56px;
+  }
+
+  .sec-head{
+    display:flex;
+    align-items:baseline;
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+  .sec-num{
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--amber);
+    letter-spacing: 0.08em;
+    border: 1px solid var(--amber-dim);
+    padding: 2px 8px;
+    background: rgba(154,116,44,0.09);
+  }
+  .sec-head h2{
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: clamp(20px, 3vw, 26px);
+    color: var(--white);
+    letter-spacing: -0.005em;
+  }
+  .sec-tag{
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-left: auto;
+    white-space: nowrap;
+  }
+
+  .prose{
+    color: var(--text);
+    font-size: 15.5px;
+    max-width: 68ch;
+    margin-bottom: 18px;
+  }
+  .prose + .prose{ margin-top: -6px; }
+
+  .prose b{ color: var(--white); font-weight: 600; }
+
+  /* ---------- SPEC TABLE (setup) ---------- */
+  .spec-table{
+    border: 1px solid var(--line-strong);
+    background: var(--bg-panel);
+    margin: 20px 0 8px;
+  }
+  .spec-row{
+    display:grid;
+    grid-template-columns: 200px 1fr;
+    border-bottom: 1px solid var(--line);
+  }
+  .spec-row:last-child{ border-bottom:none; }
+  .spec-row .label{
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--cyan);
+    padding: 14px 16px;
+    border-right: 1px solid var(--line);
+    display:flex;
+    align-items:center;
+  }
+  .spec-row .val{
+    padding: 14px 16px;
+    font-size: 14.5px;
+    color: var(--text);
+    display:flex;
+    align-items:center;
+    gap: 10px;
+  }
+  .spec-row .val .shape{
+    font-family: var(--mono);
+    color: var(--amber);
+    font-weight: 600;
+  }
+
+  /* ---------- DIAGRAM PANELS ---------- */
+  .diagram-panel{
+    border: 1px solid var(--line-strong);
+    background:
+      linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 100% 22px,
+      var(--bg-panel);
+    margin: 22px 0 26px;
+    padding: 22px 18px 16px;
+    position: relative;
+  }
+  .diagram-panel .cap{
+    position:absolute;
+    top:-10px; left: 16px;
+    background: var(--bg);
+    padding: 0 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .diagram-panel svg{ width:100%; height:auto; display:block; }
+
+  .node-box{ fill: var(--bg-panel-2); stroke: var(--line-strong); stroke-width:1; }
+  .node-box.hi{ stroke: var(--cyan); }
+  .node-box.warn{ stroke: var(--amber); }
+  .node-label{ font-family: var(--mono); fill: var(--text); }
+  .node-label.hi{ fill: var(--cyan-bright); }
+  .node-label.warn{ fill: var(--amber); }
+  .flow-line{ stroke: var(--line-strong); stroke-width:1.4; fill:none; }
+  .flow-line.hi{ stroke: var(--cyan); }
+  .flow-arrow{ fill: var(--line-strong); }
+  .flow-arrow.hi{ fill: var(--cyan); }
+  .dim-tag{ font-family: var(--mono); font-size: 10px; fill: var(--text-faint); }
+
+  /* ---------- EQUATIONS ---------- */
+  .eq-block{
+    border-left: 2px solid var(--cyan-dim);
+    background: rgba(47,115,118,0.05);
+    margin: 16px 0;
+    padding: 14px 18px;
+    overflow-x: auto;
+  }
+  .eq-note{
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--text-faint);
+    margin-top: 2px;
+  }
+  .katex{ color: var(--text) !important; font-size: 1.02em; }
+  .katex .mathrm{ color: var(--cyan-bright); }
+
+  /* ---------- LISTS ---------- */
+  ul.note-list{
+    list-style:none;
+    margin: 16px 0;
+    display: grid;
+    gap: 10px;
+  }
+  ul.note-list li{
+    display:grid;
+    grid-template-columns: 20px 1fr;
+    gap: 10px;
+    font-size: 14.5px;
+    color: var(--text);
+  }
+  ul.note-list li::before{
+    content:'▸';
+    color: var(--cyan);
+    font-family: var(--mono);
+  }
+  ul.note-list li b{ color: var(--white); font-weight:600; }
+
+  /* ---------- RATINGS TABLE ---------- */
+  .ratings{
+    width:100%;
+    border-collapse: collapse;
+    margin: 20px 0 10px;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  .ratings caption{
+    text-align:left;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 8px;
+  }
+  .ratings th, .ratings td{
+    border: 1px solid var(--line);
+    padding: 12px 14px;
+    text-align: left;
+    vertical-align: top;
+  }
+  .ratings thead th{
+    background: var(--bg-panel-2);
+    color: var(--text-faint);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  .ratings tbody th{
+    background: rgba(47,115,118,0.045);
+    color: var(--cyan);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .ratings td{ color: var(--text); }
+  .ratings td.compute{ color: var(--cyan-bright); }
+  .ratings td.mem{ color: var(--amber); }
+  .ratings tr:hover td, .ratings tr:hover th{ background: rgba(47,115,118,0.06); }
+
+  .pill{
+    display:inline-block;
+    font-size: 10.5px;
+    padding: 2px 8px;
+    border: 1px solid currentColor;
+    letter-spacing: 0.06em;
+  }
+  .pill.compute{ color: var(--cyan-bright); }
+  .pill.mem{ color: var(--amber); }
+
+  /* ---------- CALLOUT ---------- */
+  .callout{
+    border: 1px dashed var(--amber-dim);
+    background: rgba(154,116,44,0.07);
+    padding: 16px 18px;
+    margin: 22px 0 4px;
+    font-size: 14.5px;
+    color: var(--text);
+    position: relative;
+  }
+  .callout .cap{
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--amber);
+    display:block;
+    margin-bottom: 8px;
+  }
+
+  /* ---------- FOOTER ---------- */
+  footer{
+    margin-top: 72px;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  hr.div{
+    border:none;
+    border-top: 1px solid var(--line);
+    margin: 40px 0 0;
+  }
+
+  @media (max-width: 640px){
+    .rail{ display:none; }
+    .page{ padding: 0 18px; }
+    .spec-row{ grid-template-columns: 1fr; }
+    .spec-row .label{ border-right:none; border-bottom: 1px solid var(--line); }
+    .doc-id-row{ font-size: 9.5px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    html{ scroll-behavior:auto; }
+  }
+</style>
+</head>
+<body>
+
+<div class="rail left">
+  <span class="stamp">Q·K·V - 6×4 - 4×4</span>
+  <div class="tick"></div>
+</div>
+<div class="rail right">
+  <div class="tick"></div>
+  <span class="stamp">HBM ⇄ SRAM ⇄ SM</span>
+</div>
+
+<div class="page">
+
+  <header class="masthead">
+    <div class="doc-id-row">
+      <span>DOC / ATTN&#8209;6X4&#8209;GPU</span>
+      <span class="dim">REV. 2026&#8209;08</span>
+    </div>
+    <h1 class="title">Attention Mechanics <span class="accent">&amp;</span> GPU Execution</h1>
+    <p class="subtitle">Tracing a single attention block through its matrix shapes, then down through the memory hierarchy - from GEMM-bound prefill to GEMV-bound, bandwidth-starved decode.</p>
+    <div class="spec-strip">
+      <div class="cell"><span class="k">Sequence length N</span><span class="v">6</span></div>
+      <div class="cell"><span class="k">Embedding dim d</span><span class="v">4</span></div>
+      <div class="cell"><span class="k">Input X</span><span class="v">6 × 4</span></div>
+      <div class="cell"><span class="k">Weights Wq,k,v</span><span class="v">4 × 4</span></div>
+    </div>
+  </header>
+
+  <!-- ============ SECTION 01 ============ -->
+  <section class="block" id="setup">
+    <div class="sec-head">
+      <span class="sec-num">01</span>
+      <h2>Core Dimensions &amp; Setup</h2>
+      <span class="sec-tag">Definitions</span>
+    </div>
+    <p class="prose">Let <b>N = 6</b> tokens and <b>d = 4</b> embedding dimensions. Every shape that follows is derived from these two numbers.</p>
+
+    <div class="spec-table">
+      <div class="spec-row">
+        <div class="label">Input Matrix (X)</div>
+        <div class="val"><span class="shape">6 × 4</span> - 6 tokens, each a 4‑dimensional vector.</div>
+      </div>
+      <div class="spec-row">
+        <div class="label">Projection Weights</div>
+        <div class="val"><span class="shape">4 × 4</span> - W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub>, one matrix per projection.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION 02 : PREFILL ============ -->
+  <section class="block" id="prefill">
+    <div class="sec-head">
+      <span class="sec-num">02</span>
+      <h2>Phase 1 - Prefill</h2>
+      <span class="sec-tag">Prompt processing</span>
+    </div>
+    <p class="prose">The entire prompt is processed in one shot. Every token's query, key, and value vector is produced by the same batched matrix multiply, and every token attends to every other token simultaneously.</p>
+
+    <div class="diagram-panel">
+      <span class="cap">Fig 1 - Prefill dataflow</span>
+      <svg viewBox="0 0 760 430" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" class="flow-arrow"></path>
+          </marker>
+          <marker id="arrow1hi" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" class="flow-arrow hi"></path>
+          </marker>
+        </defs>
+
+        <!-- X -->
+        <rect x="330" y="10" width="100" height="34" class="node-box"></rect>
+        <text x="380" y="31" text-anchor="middle" class="node-label" font-size="13">X · W_Q,K,V</text>
+        <text x="380" y="56" text-anchor="middle" class="dim-tag">(6×4) × (4×4)</text>
+
+        <line x1="380" y1="44" x2="380" y2="80" class="flow-line" marker-end="url(#arrow1)"></line>
+
+        <!-- Q,K,V -->
+        <rect x="315" y="82" width="130" height="34" class="node-box hi"></rect>
+        <text x="380" y="103" text-anchor="middle" class="node-label hi" font-size="13">Q, K, V  (6×4)</text>
+
+        <line x1="380" y1="116" x2="380" y2="140" class="flow-line" marker-end="url(#arrow1)"></line>
+
+        <!-- split -->
+        <line x1="380" y1="140" x2="220" y2="140" class="flow-line"></line>
+        <line x1="380" y1="140" x2="540" y2="140" class="flow-line"></line>
+        <line x1="220" y1="140" x2="220" y2="170" class="flow-line" marker-end="url(#arrow1)"></line>
+        <line x1="540" y1="140" x2="540" y2="170" class="flow-line" marker-end="url(#arrow1)"></line>
+
+        <rect x="165" y="172" width="110" height="34" class="node-box"></rect>
+        <text x="220" y="193" text-anchor="middle" class="node-label" font-size="13">Q  (6×4)</text>
+
+        <rect x="485" y="172" width="110" height="34" class="node-box"></rect>
+        <text x="540" y="193" text-anchor="middle" class="node-label" font-size="13">K&#8407;  (4×6)</text>
+
+        <line x1="220" y1="206" x2="220" y2="236" class="flow-line"></line>
+        <line x1="540" y1="206" x2="540" y2="236" class="flow-line"></line>
+        <line x1="220" y1="236" x2="380" y2="236" class="flow-line"></line>
+        <line x1="540" y1="236" x2="380" y2="236" class="flow-line"></line>
+        <line x1="380" y1="236" x2="380" y2="256" class="flow-line" marker-end="url(#arrow1)"></line>
+
+        <!-- S -->
+        <rect x="310" y="258" width="140" height="36" class="node-box warn"></rect>
+        <text x="380" y="280" text-anchor="middle" class="node-label warn" font-size="13">S = Q Kᵀ  (6×6)</text>
+
+        <line x1="380" y1="294" x2="380" y2="318" class="flow-line hi" marker-end="url(#arrow1hi)"></line>
+
+        <!-- softmax -->
+        <rect x="290" y="320" width="180" height="34" class="node-box hi"></rect>
+        <text x="380" y="341" text-anchor="middle" class="node-label hi" font-size="12.5">Softmax(S/√d) = A  (6×6)</text>
+
+        <line x1="380" y1="354" x2="290" y2="380" class="flow-line" marker-end="url(#arrow1)"></line>
+        <line x1="380" y1="354" x2="540" y2="380" class="flow-line" marker-end="url(#arrow1)"></line>
+
+        <rect x="215" y="382" width="110" height="34" class="node-box"></rect>
+        <text x="270" y="403" text-anchor="middle" class="node-label" font-size="13">A  (6×6)</text>
+
+        <rect x="490" y="382" width="110" height="34" class="node-box"></rect>
+        <text x="545" y="403" text-anchor="middle" class="node-label" font-size="13">V  (6×4)</text>
+
+        <text x="670" y="290" class="dim-tag" font-size="11">S / √d</text>
+        <text x="670" y="306" class="dim-tag" font-size="10">scale by 1/√dₖ</text>
+
+      </svg>
+    </div>
+
+    <div class="eq-block">
+      $$Q = XW_Q,\quad K = XW_K,\quad V = XW_V \;\rightarrow\; (6\times4)\times(4\times4) = 6\times4$$
+    </div>
+    <div class="eq-block">
+      $$S = QK^{\mathsf T} \;\rightarrow\; (6\times4)\times(4\times6) = 6\times6$$
+      <div class="eq-note">Cell (i, j) - how much token i attends to token j.</div>
+    </div>
+    <div class="eq-block">
+      $$A = \mathrm{Softmax}\!\left(\frac{S}{\sqrt d}\right) \quad (6\times6), \qquad \mathrm{Output} = AV \;\rightarrow\; (6\times6)\times(6\times4) = 6\times4$$
+      <div class="eq-note">Row-wise softmax; result is context-enriched representations for all 6 tokens.</div>
+    </div>
+  </section>
+
+  <!-- ============ SECTION 03 : HARDWARE MAPPING ============ -->
+  <section class="block" id="hardware">
+    <div class="sec-head">
+      <span class="sec-num">03</span>
+      <h2>Hardware Mapping</h2>
+      <span class="sec-tag">Inside the Streaming Multiprocessors</span>
+    </div>
+    <p class="prose">A modern GPU packs dozens of <b>Streaming Multiprocessors (SMs)</b>, each with its own shared memory / L1 cache, warp schedulers, CUDA cores, and Tensor Cores.</p>
+
+    <div class="diagram-panel">
+      <span class="cap">Fig 2 - Memory hierarchy → SM tiling</span>
+      <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" class="flow-arrow"></path>
+          </marker>
+        </defs>
+
+        <rect x="60" y="10" width="640" height="46" class="node-box hi"></rect>
+        <text x="380" y="30" text-anchor="middle" class="node-label hi" font-size="13">GPU Global Memory (HBM / VRAM)</text>
+        <text x="380" y="47" text-anchor="middle" class="dim-tag">Weights W · Inputs X · KV Cache</text>
+
+        <line x1="380" y1="56" x2="380" y2="86" class="flow-line" marker-end="url(#arrow2)"></line>
+        <text x="398" y="76" class="dim-tag" font-size="10">high-bandwidth bus</text>
+
+        <rect x="120" y="88" width="520" height="34" class="node-box"></rect>
+        <text x="380" y="109" text-anchor="middle" class="node-label" font-size="13">L2 Cache</text>
+
+        <line x1="260" y1="122" x2="260" y2="150" class="flow-line" marker-end="url(#arrow2)"></line>
+        <line x1="500" y1="122" x2="500" y2="150" class="flow-line" marker-end="url(#arrow2)"></line>
+
+        <!-- SM 0 -->
+        <rect x="120" y="152" width="280" height="132" class="node-box"></rect>
+        <text x="260" y="174" text-anchor="middle" class="node-label" font-size="12.5">Streaming Multiproc. - SM 0</text>
+        <rect x="145" y="188" width="230" height="30" class="node-box" fill="rgba(47,115,118,0.08)"></rect>
+        <text x="260" y="207" text-anchor="middle" class="node-label" font-size="11.5">Shared Mem / L1</text>
+        <line x1="260" y1="218" x2="260" y2="234" class="flow-line" marker-end="url(#arrow2)"></line>
+        <rect x="145" y="236" width="230" height="34" class="node-box warn"></rect>
+        <text x="260" y="253" text-anchor="middle" class="node-label warn" font-size="11.5">Tensor Cores</text>
+        <text x="260" y="267" text-anchor="middle" class="dim-tag" font-size="10">computes tile (0,0)</text>
+
+        <!-- SM 1 -->
+        <rect x="420" y="152" width="220" height="132" class="node-box"></rect>
+        <text x="530" y="174" text-anchor="middle" class="node-label" font-size="12.5">SM 1</text>
+        <rect x="440" y="188" width="180" height="30" class="node-box" fill="rgba(47,115,118,0.08)"></rect>
+        <text x="530" y="207" text-anchor="middle" class="node-label" font-size="11.5">Shared Mem / L1</text>
+        <line x1="530" y1="218" x2="530" y2="234" class="flow-line" marker-end="url(#arrow2)"></line>
+        <rect x="440" y="236" width="180" height="34" class="node-box warn"></rect>
+        <text x="530" y="253" text-anchor="middle" class="node-label warn" font-size="11.5">Tensor Cores</text>
+        <text x="530" y="267" text-anchor="middle" class="dim-tag" font-size="10">computes tile (0,1)</text>
+
+        <text x="660" y="220" class="dim-tag" font-size="10">···SM N</text>
+      </svg>
+    </div>
+
+    <ul class="note-list">
+      <li><span><b>Tiling &amp; thread blocks</b> - the 6×4 and 4×4 operations split into 2D tiles; thread blocks land on different SMs across the chip.</span></li>
+      <li><span><b>True hardware concurrency</b> - separate SMs execute arithmetic on separate matrix tiles in the same clock cycles.</span></li>
+      <li><span><b>Tensor Core utilization</b> - MMA instructions load sub-matrices straight into Tensor Core registers to run dot products in parallel.</span></li>
+      <li><span><b>Execution profile: compute-bound</b> - the 6×4×4 matrix–matrix multiplies carry high arithmetic intensity, keeping Tensor Cores saturated.</span></li>
+    </ul>
+  </section>
+
+  <!-- ============ SECTION 04 : DECODE ============ -->
+  <section class="block" id="decode">
+    <div class="sec-head">
+      <span class="sec-num">04</span>
+      <h2>Phase 2 - Autoregressive Decode</h2>
+      <span class="sec-tag">Generating token #7</span>
+    </div>
+    <p class="prose">Once prefill finishes, generation turns sequential. To produce token #7, only the newly generated token needs projecting - everything before it is already sitting in the KV cache.</p>
+
+    <div class="diagram-panel">
+      <span class="cap">Fig 3 - Decode-step dataflow</span>
+      <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow3" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" class="flow-arrow"></path>
+          </marker>
+          <marker id="arrow3hi" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" class="flow-arrow hi"></path>
+          </marker>
+        </defs>
+
+        <rect x="300" y="10" width="160" height="34" class="node-box hi"></rect>
+        <text x="380" y="31" text-anchor="middle" class="node-label hi" font-size="13">New token x₇  (1×4)</text>
+
+        <line x1="380" y1="44" x2="380" y2="66" class="flow-line"></line>
+        <line x1="200" y1="66" x2="560" y2="66" class="flow-line"></line>
+        <line x1="200" y1="66" x2="200" y2="86" class="flow-line" marker-end="url(#arrow3)"></line>
+        <line x1="380" y1="66" x2="380" y2="86" class="flow-line" marker-end="url(#arrow3)"></line>
+        <line x1="560" y1="66" x2="560" y2="86" class="flow-line" marker-end="url(#arrow3)"></line>
+
+        <rect x="155" y="88" width="90" height="30" class="node-box"></rect>
+        <text x="200" y="108" text-anchor="middle" class="node-label" font-size="12">W_Q</text>
+        <rect x="335" y="88" width="90" height="30" class="node-box"></rect>
+        <text x="380" y="108" text-anchor="middle" class="node-label" font-size="12">W_K</text>
+        <rect x="515" y="88" width="90" height="30" class="node-box"></rect>
+        <text x="560" y="108" text-anchor="middle" class="node-label" font-size="12">W_V</text>
+
+        <line x1="200" y1="118" x2="200" y2="140" class="flow-line" marker-end="url(#arrow3)"></line>
+        <line x1="380" y1="118" x2="380" y2="140" class="flow-line" marker-end="url(#arrow3)"></line>
+        <line x1="560" y1="118" x2="560" y2="140" class="flow-line" marker-end="url(#arrow3)"></line>
+
+        <rect x="150" y="142" width="100" height="30" class="node-box warn"></rect>
+        <text x="200" y="162" text-anchor="middle" class="node-label warn" font-size="12">q_new (1×4)</text>
+        <rect x="330" y="142" width="100" height="30" class="node-box warn"></rect>
+        <text x="380" y="162" text-anchor="middle" class="node-label warn" font-size="12">k_new (1×4)</text>
+        <rect x="510" y="142" width="100" height="30" class="node-box warn"></rect>
+        <text x="560" y="162" text-anchor="middle" class="node-label warn" font-size="12">v_new (1×4)</text>
+
+        <line x1="380" y1="172" x2="380" y2="188" class="flow-line hi"></line>
+        <line x1="560" y1="172" x2="560" y2="188" class="flow-line hi"></line>
+        <line x1="380" y1="188" x2="470" y2="188" class="flow-line hi"></line>
+        <line x1="560" y1="188" x2="470" y2="188" class="flow-line hi"></line>
+        <line x1="470" y1="188" x2="470" y2="208" class="flow-line hi" marker-end="url(#arrow3hi)"></line>
+
+        <rect x="330" y="210" width="280" height="34" class="node-box hi"></rect>
+        <text x="470" y="231" text-anchor="middle" class="node-label hi" font-size="12.5">Append to KV Cache (HBM)</text>
+
+        <line x1="470" y1="244" x2="470" y2="264" class="flow-line hi" marker-end="url(#arrow3hi)"></line>
+        <text x="470" y="284" text-anchor="middle" class="node-label" font-size="13">K_all, V_all  (7×4)</text>
+
+        <line x1="200" y1="172" x2="200" y2="264" class="flow-line" stroke-dasharray="3,3"></line>
+        <text x="140" y="230" class="dim-tag" font-size="10" transform="rotate(-90 140 230)">q₇ used directly</text>
+      </svg>
+    </div>
+
+    <div class="eq-block">
+      $$q_7 = x_7W_Q,\quad k_7 = x_7W_K,\quad v_7 = x_7W_V \;\rightarrow\; (1\times4)\times(4\times4) = 1\times4$$
+    </div>
+    <div class="eq-block">
+      $$K_{\text{all}} = \begin{bmatrix}K_{\text{cached}}\\ k_7\end{bmatrix}\ (7\times4), \qquad V_{\text{all}} = \begin{bmatrix}V_{\text{cached}}\\ v_7\end{bmatrix}\ (7\times4)$$
+      <div class="eq-note">k₇ and v₇ append to the existing cache rather than recomputing tokens 1–6.</div>
+    </div>
+    <div class="eq-block">
+      $$S_{\text{decode}} = q_7K_{\text{all}}^{\mathsf T} \;\rightarrow\; (1\times4)\times(4\times7) = 1\times7$$
+      $$\mathrm{Output}_7 = \mathrm{Softmax}\!\left(\frac{S_{\text{decode}}}{\sqrt d}\right)V_{\text{all}} \;\rightarrow\; (1\times7)\times(7\times4) = 1\times4$$
+    </div>
+
+    <div class="callout">
+      <span class="cap">Why decode feels slow</span>
+      Every single generated token drags the full weight matrices and the entire KV cache across the memory bus - for one row of arithmetic. Low arithmetic intensity per byte moved is the whole story.
+    </div>
+  </section>
+
+  <!-- ============ SECTION 05 : COMPARISON ============ -->
+  <section class="block" id="comparison">
+    <div class="sec-head">
+      <span class="sec-num">05</span>
+      <h2>Hardware Profile Comparison</h2>
+      <span class="sec-tag">Prefill vs. decode</span>
+    </div>
+
+    <table class="ratings">
+      <caption>Table 1 - per-phase execution characteristics</caption>
+      <thead>
+        <tr>
+          <th>Attribute</th>
+          <th>Prefill Phase</th>
+          <th>Decode Phase</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">Operation type</th>
+          <td>GEMM (matrix × matrix)</td>
+          <td>GEMV (vector × matrix)</td>
+        </tr>
+        <tr>
+          <th scope="row">Input shape (X)</th>
+          <td>6 × 4</td>
+          <td>1 × 4</td>
+        </tr>
+        <tr>
+          <th scope="row">Attention output</th>
+          <td>6 × 4</td>
+          <td>1 × 4</td>
+        </tr>
+        <tr>
+          <th scope="row">Primary bottleneck</th>
+          <td class="compute"><span class="pill compute">compute-bound</span><br>Tensor Core FLOPS</td>
+          <td class="mem"><span class="pill mem">memory-bound</span><br>HBM ⇄ SRAM transfer</td>
+        </tr>
+        <tr>
+          <th scope="row">SM state</th>
+          <td>High Tensor Core occupancy</td>
+          <td>Low occupancy - cores stall on weight loads</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <hr class="div">
+
+  <footer>
+    <span>ATTN&#8209;6X4&#8209;GPU // END OF DOCUMENT</span>
+    <span>N = 6 · d = 4 · seq → 7</span>
+    <span>© 2026 Mani · Inference Engineering</span>
+  </footer>
+
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          {left: "$$", right: "$$", display: true},
+          {left: "$", right: "$", display: false}
+        ],
+        throwOnError: false
+      });
+    }
+  });
+</script>
+
+</body>
+</html>

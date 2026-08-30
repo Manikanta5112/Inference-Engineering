@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demystifying LLM Attention: From MHA to MQA, GQA, and DeepSeek's MLA</title>
+
+    <!-- KaTeX for proper math rendering -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+
+    <style>
+        :root {
+            --bg-primary: #fbfaf6;
+            --bg-secondary: #fffdf8;
+            --bg-tertiary: #f1ebe2;
+            --text-primary: #181714;
+            --text-secondary: #67615a;
+            --text-muted: #9a948a;
+            --accent-blue: #2f5f91;
+            --accent-purple: #64518f;
+            --accent-green: #30745d;
+            --accent-amber: #9a742c;
+            --accent-red: #9b4b3d;
+            --border-color: #ddd5ca;
+            --code-bg: #f1ebe2;
+            --card-hover: #ece5d8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.7;
+            font-size: 16px;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 48px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 32px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: rgba(47, 95, 145, 0.15);
+            color: var(--accent-blue);
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            border: 1px solid rgba(47, 95, 145, 0.3);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            line-height: 1.25;
+            color: #181714;
+            margin-bottom: 16px;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+
+        .meta {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        h2 {
+            font-size: 1.75rem;
+            color: #181714;
+            margin: 44px 0 18px 0;
+            border-left: 4px solid var(--accent-blue);
+            padding-left: 14px;
+            letter-spacing: -0.01em;
+        }
+
+        h3 {
+            font-size: 1.3rem;
+            color: var(--accent-blue);
+            margin: 28px 0 14px 0;
+        }
+
+        p {
+            margin-bottom: 18px;
+            color: var(--text-primary);
+        }
+
+        ul, ol {
+            margin-bottom: 20px;
+            padding-left: 24px;
+            color: var(--text-primary);
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        strong {
+            color: #181714;
+        }
+
+        code {
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            background-color: var(--code-bg);
+            color: var(--accent-purple);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            border: 1px solid var(--border-color);
+        }
+
+        /* Math containers now hand rendering off to KaTeX; we only keep the box chrome + color */
+        .math-block {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin: 20px 0;
+            text-align: center;
+            color: #181714;
+            overflow-x: auto;
+        }
+
+        .math-inline {
+            color: var(--accent-purple);
+        }
+
+        /* Make sure KaTeX text is visible on the dark background */
+        .katex { color: inherit; }
+
+        .card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 24px;
+            margin: 24px 0;
+        }
+
+        .callout {
+            border-left: 4px solid var(--accent-amber);
+            background: rgba(154, 116, 44, 0.1);
+            padding: 16px 20px;
+            border-radius: 0 8px 8px 0;
+            margin: 20px 0;
+        }
+
+        .callout-success {
+            border-left: 4px solid var(--accent-green);
+            background: rgba(48, 116, 93, 0.1);
+        }
+
+        .callout-title {
+            font-weight: 700;
+            color: #181714;
+            margin-bottom: 6px;
+        }
+
+        /* SVG Architecture Diagrams */
+        .diagram-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 28px 0;
+            text-align: center;
+        }
+
+        .diagram-title {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            margin-top: 10px;
+            font-weight: 500;
+        }
+
+        /* Data Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 24px 0;
+            font-size: 14.5px;
+        }
+
+        th, td {
+            padding: 12px 14px;
+            text-align: left;
+            border: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: var(--bg-tertiary);
+            color: #181714;
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) {
+            background-color: rgba(24, 23, 20, 0.025);
+        }
+
+        tr:hover {
+            background-color: rgba(24, 23, 20, 0.05);
+        }
+
+        .highlight-green { color: var(--accent-green); font-weight: 600; }
+        .highlight-blue { color: var(--accent-blue); font-weight: 600; }
+        .highlight-amber { color: var(--accent-amber); font-weight: 600; }
+
+        footer {
+            margin-top: 60px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-muted);
+            text-align: center;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="badge">Deep Dive &bull; LLM System Architecture</div>
+        <h1>Understanding the Evolution of Attention: MHA, MQA, GQA, and MLA</h1>
+        <p class="subtitle">A complete mathematical and visual walkthrough of how modern transformer architectures solve the memory bandwidth bottleneck in large language models.</p>
+    </header>
+
+    <section id="introduction">
+        <h2>1. The Core Bottleneck: Why We Need New Attention Variants</h2>
+        <p>
+            When deploying Large Language Models (LLMs) at scale, the primary performance bottleneck during token generation (autoregressive decoding) is <strong>memory bandwidth</strong>, not compute throughput (FLOPs).
+        </p>
+        <p>
+            To generate each new token, the model needs the Key and Value representations of all previous tokens. Storing these representations in GPU memory is known as the <strong>KV Cache</strong>. As context windows expand to 32k, 128k, or 1M tokens, the KV cache becomes enormous, quickly exhausting High Bandwidth Memory (HBM) and causing memory-bound latency.
+        </p>
+
+        <div class="math-block">
+            $$\text{KV Cache Size (Bytes)} = 2 \times B \times L \times N_{\text{layers}} \times H_{KV} \times d_k \times P$$
+        </div>
+
+        <div class="card">
+            <h3>Breaking Down the Parameters:</h3>
+            <ul>
+                <li><strong>2:</strong> Storing both the Key matrix (<span class="math-inline">$K$</span>) and Value matrix (<span class="math-inline">$V$</span>).</li>
+                <li><strong><span class="math-inline">$B$</span> (Batch Size):</strong> Number of independent prompt sequences processed concurrently.</li>
+                <li><strong><span class="math-inline">$L$</span> (Sequence / Context Length):</strong> Total tokens in prompt + generated so far.</li>
+                <li><strong><span class="math-inline">$N_{\text{layers}}$</span>:</strong> Number of Transformer layers in the network.</li>
+                <li><strong><span class="math-inline">$H_{KV}$</span>:</strong> Number of Key-Value heads allocated.</li>
+                <li><strong><span class="math-inline">$d_k$</span>:</strong> Dimension of each attention head (often <span class="math-inline">$d_{\text{model}} / H_Q$</span>).</li>
+                <li><strong><span class="math-inline">$P$</span>:</strong> Precision in bytes (e.g., 2 bytes for FP16/BF16, 1 byte for FP8).</li>
+            </ul>
+        </div>
+    </section>
+
+    <!-- Visual Architecture Comparison -->
+    <div class="diagram-container">
+        <svg viewBox="0 0 800 260" width="100%" height="260" xmlns="http://www.w3.org/2000/svg">
+            <style>
+                .box-q { fill: #3d6fa0; stroke: #1f4060; stroke-width: 1.5; rx: 4; }
+                .box-k { fill: #3f8a5c; stroke: #1f4a30; stroke-width: 1.5; rx: 4; }
+                .box-v { fill: #7a5fa8; stroke: #4a3568; stroke-width: 1.5; rx: 4; }
+                .box-l { fill: #a8823a; stroke: #6b4f1e; stroke-width: 1.5; rx: 4; }
+                .text-label { fill: #ffffff; font-family: sans-serif; font-size: 11px; text-anchor: middle; font-weight: bold; }
+                .title-svg { fill: #181714; font-family: sans-serif; font-size: 13px; text-anchor: middle; font-weight: bold; }
+                .sub-svg { fill: #67615a; font-family: sans-serif; font-size: 10px; text-anchor: middle; }
+                .conn { stroke: #c9bfa8; stroke-width: 1.5; stroke-dasharray: 2; }
+            </style>
+
+            <!-- MHA -->
+            <g transform="translate(10, 20)">
+                <text x="85" y="0" class="title-svg">MHA (Multi-Head)</text>
+                <text x="85" y="15" class="sub-svg">H_Q = 4, H_KV = 4</text>
+                <!-- Q Heads -->
+                <rect x="0" y="30" width="35" height="20" class="box-q"/><text x="17" y="44" class="text-label">Q&#8321;</text>
+                <rect x="45" y="30" width="35" height="20" class="box-q"/><text x="62" y="44" class="text-label">Q&#8322;</text>
+                <rect x="90" y="30" width="35" height="20" class="box-q"/><text x="107" y="44" class="text-label">Q&#8323;</text>
+                <rect x="135" y="30" width="35" height="20" class="box-q"/><text x="152" y="44" class="text-label">Q&#8324;</text>
+                <!-- K Heads -->
+                <rect x="0" y="65" width="35" height="20" class="box-k"/><text x="17" y="79" class="text-label">K&#8321;</text>
+                <rect x="45" y="65" width="35" height="20" class="box-k"/><text x="62" y="79" class="text-label">K&#8322;</text>
+                <rect x="90" y="65" width="35" height="20" class="box-k"/><text x="107" y="79" class="text-label">K&#8323;</text>
+                <rect x="135" y="65" width="35" height="20" class="box-k"/><text x="152" y="79" class="text-label">K&#8324;</text>
+                <!-- V Heads -->
+                <rect x="0" y="100" width="35" height="20" class="box-v"/><text x="17" y="114" class="text-label">V&#8321;</text>
+                <rect x="45" y="100" width="35" height="20" class="box-v"/><text x="62" y="114" class="text-label">V&#8322;</text>
+                <rect x="90" y="100" width="35" height="20" class="box-v"/><text x="107" y="114" class="text-label">V&#8323;</text>
+                <rect x="135" y="100" width="35" height="20" class="box-v"/><text x="152" y="114" class="text-label">V&#8324;</text>
+                <text x="85" y="150" class="sub-svg">Full KV Cache: 100%</text>
+            </g>
+
+            <!-- MQA -->
+            <g transform="translate(215, 20)">
+                <text x="85" y="0" class="title-svg">MQA (Multi-Query)</text>
+                <text x="85" y="15" class="sub-svg">H_Q = 4, H_KV = 1</text>
+                <!-- Q Heads -->
+                <rect x="0" y="30" width="35" height="20" class="box-q"/><text x="17" y="44" class="text-label">Q&#8321;</text>
+                <rect x="45" y="30" width="35" height="20" class="box-q"/><text x="62" y="44" class="text-label">Q&#8322;</text>
+                <rect x="90" y="30" width="35" height="20" class="box-q"/><text x="107" y="44" class="text-label">Q&#8323;</text>
+                <rect x="135" y="30" width="35" height="20" class="box-q"/><text x="152" y="44" class="text-label">Q&#8324;</text>
+                <!-- Shared K & V -->
+                <rect x="0" y="65" width="170" height="20" class="box-k"/><text x="85" y="79" class="text-label">Shared K (Single Head)</text>
+                <rect x="0" y="100" width="170" height="20" class="box-v"/><text x="85" y="114" class="text-label">Shared V (Single Head)</text>
+                <text x="85" y="150" class="sub-svg">KV Cache: 25% (4&times; Savings)</text>
+            </g>
+
+            <!-- GQA -->
+            <g transform="translate(420, 20)">
+                <text x="85" y="0" class="title-svg">GQA (Grouped-Query)</text>
+                <text x="85" y="15" class="sub-svg">H_Q = 4, G = 2</text>
+                <!-- Q Heads -->
+                <rect x="0" y="30" width="35" height="20" class="box-q"/><text x="17" y="44" class="text-label">Q&#8321;</text>
+                <rect x="45" y="30" width="35" height="20" class="box-q"/><text x="62" y="44" class="text-label">Q&#8322;</text>
+                <rect x="90" y="30" width="35" height="20" class="box-q"/><text x="107" y="44" class="text-label">Q&#8323;</text>
+                <rect x="135" y="30" width="35" height="20" class="box-q"/><text x="152" y="44" class="text-label">Q&#8324;</text>
+                <!-- Group K & V -->
+                <rect x="0" y="65" width="80" height="20" class="box-k"/><text x="40" y="79" class="text-label">K&#8321; (Grp 1)</text>
+                <rect x="90" y="65" width="80" height="20" class="box-k"/><text x="130" y="79" class="text-label">K&#8322; (Grp 2)</text>
+                <rect x="0" y="100" width="80" height="20" class="box-v"/><text x="40" y="114" class="text-label">V&#8321; (Grp 1)</text>
+                <rect x="90" y="100" width="80" height="20" class="box-v"/><text x="130" y="114" class="text-label">V&#8322; (Grp 2)</text>
+                <text x="85" y="150" class="sub-svg">KV Cache: 50% (2&times; Savings)</text>
+            </g>
+
+            <!-- MLA -->
+            <g transform="translate(625, 20)">
+                <text x="80" y="0" class="title-svg">MLA (DeepSeek Latent)</text>
+                <text x="80" y="15" class="sub-svg">Low-Rank Compressed</text>
+                <!-- Q Heads -->
+                <rect x="0" y="30" width="35" height="20" class="box-q"/><text x="17" y="44" class="text-label">Q&#8321;</text>
+                <rect x="40" y="30" width="35" height="20" class="box-q"/><text x="57" y="44" class="text-label">Q&#8322;</text>
+                <rect x="80" y="30" width="35" height="20" class="box-q"/><text x="97" y="44" class="text-label">Q&#8323;</text>
+                <rect x="120" y="30" width="35" height="20" class="box-q"/><text x="137" y="44" class="text-label">Q&#8324;</text>
+                <!-- Latent Vector Cache -->
+                <rect x="0" y="65" width="155" height="35" class="box-l"/><text x="77" y="87" class="text-label">Compressed Latent c_t^(KV)</text>
+                <text x="77" y="125" class="sub-svg">Decoupled RoPE k_t^R</text>
+                <text x="77" y="150" class="sub-svg">Massive 8&times;-16&times; Savings</text>
+            </g>
+        </svg>
+        <div class="diagram-title">Figure 1: Structural comparison of KV-cache allocation across Attention Mechanisms.</div>
+    </div>
+
+    <!-- Section 2: MQA -->
+    <section id="mqa">
+        <h2>2. Multi-Query Attention (MQA): The Minimalist Approach</h2>
+        <p>
+            In standard Multi-Head Attention (MHA), every Query head has its own Key and Value head. In <strong>Multi-Query Attention (MQA)</strong>, all <span class="math-inline">$H_Q$</span> Query heads share a <strong>single Key and Value head</strong>.
+        </p>
+
+        <h3>Mathematical Walkthrough with Concrete Dimensions</h3>
+        <p>Let's trace the operations with a concrete input matrix:</p>
+        <ul>
+            <li><strong>Input sequence:</strong> <span class="math-inline">$X \in \mathbb{R}^{3 \times 4}$</span> (Sequence length <span class="math-inline">$N = 3$</span>, embedding dimension <span class="math-inline">$d_{\text{in}} = 4$</span>).</li>
+            <li><strong>2 Query Heads:</strong> <span class="math-inline">$W_{Q1}, W_{Q2} \in \mathbb{R}^{4 \times 2}$</span>.</li>
+            <li><strong>Shared Key & Value:</strong> <span class="math-inline">$W_K, W_V \in \mathbb{R}^{4 \times 2}$</span> (Head dimension <span class="math-inline">$d_k = 2$</span>).</li>
+        </ul>
+
+        <div class="card">
+            <h4>Step 1: Projections</h4>
+            <p><span class="math-inline">$Q_1 = X W_{Q1} \in \mathbb{R}^{3 \times 2}$</span> &nbsp;|&nbsp; <span class="math-inline">$Q_2 = X W_{Q2} \in \mathbb{R}^{3 \times 2}$</span></p>
+            <p><span class="math-inline">$K = X W_K \in \mathbb{R}^{3 \times 2}$</span> &nbsp;|&nbsp; <span class="math-inline">$V = X W_V \in \mathbb{R}^{3 \times 2}$</span> (Shared across both heads)</p>
+
+            <h4>Step 2: Attention Computation per Head</h4>
+            <p><strong>Head 1:</strong></p>
+            <div class="math-block">
+                $$S_1 = Q_1 K^T \in \mathbb{R}^{3 \times 3} \implies A_1 = \text{softmax}\left(\frac{S_1}{\sqrt{2}}\right) \implies O_1 = A_1 V \in \mathbb{R}^{3 \times 2}$$
+            </div>
+            <p><strong>Head 2:</strong></p>
+            <div class="math-block">
+                $$S_2 = Q_2 K^T \in \mathbb{R}^{3 \times 3} \implies A_2 = \text{softmax}\left(\frac{S_2}{\sqrt{2}}\right) \implies O_2 = A_2 V \in \mathbb{R}^{3 \times 2}$$
+            </div>
+
+            <h4>Step 3: Concatenation and Final Projection</h4>
+            <p>We concatenate both output context vectors and project using <span class="math-inline">$W_O \in \mathbb{R}^{4 \times 4}$</span>:</p>
+            <div class="math-block">
+                $$O_{\text{concat}} = [O_1, O_2] \in \mathbb{R}^{3 \times 4} \implies O = O_{\text{concat}} W_O \in \mathbb{R}^{3 \times 4}$$
+            </div>
+        </div>
+
+        <div class="callout">
+            <div class="callout-title">Key Insight on Perspectives vs. Tradeoff:</div>
+            Even though <span class="math-inline">$K$</span> and <span class="math-inline">$V$</span> are shared, <strong>each Query head still retains its own unique perspective</strong> because <span class="math-inline">$Q_1 \neq Q_2$</span> yields different attention weight distributions (<span class="math-inline">$A_1 \neq A_2$</span>). However, because the Value vectors are identical, model expressivity suffers slightly.
+        </div>
+    </section>
+
+    <!-- Section 3: GQA -->
+    <section id="gqa">
+        <h2>3. Grouped-Query Attention (GQA): The Golden Mean</h2>
+        <p>
+            Grouped-Query Attention interpolates between MHA and MQA by partitioning <span class="math-inline">$H_Q$</span> query heads into <span class="math-inline">$G$</span> groups. Each group shares its own dedicated <span class="math-inline">$(K_g, V_g)$</span> pair.
+        </p>
+
+        <h3>GQA Derivation (<span class="math-inline">$H_Q = 4, G = 2$</span>)</h3>
+        <p>Assume 4 Query heads grouped into 2 pairs (<span class="math-inline">$G_1 = \{Q_1, Q_2\}, G_2 = \{Q_3, Q_4\}$</span>):</p>
+
+        <div class="card">
+            <h4>Group 1 Projections & Computations (using <span class="math-inline">$K_1, V_1$</span>):</h4>
+            <div class="math-block">
+                $$O_1 = \text{softmax}\left(\frac{Q_1 K_1^T}{\sqrt{d_k}}\right) V_1 \in \mathbb{R}^{3 \times 2} \quad \text{and} \quad O_2 = \text{softmax}\left(\frac{Q_2 K_1^T}{\sqrt{d_k}}\right) V_1 \in \mathbb{R}^{3 \times 2}$$
+            </div>
+
+            <h4>Group 2 Projections & Computations (using distinct <span class="math-inline">$K_2, V_2$</span>):</h4>
+            <div class="math-block">
+                $$O_3 = \text{softmax}\left(\frac{Q_3 K_2^T}{\sqrt{d_k}}\right) V_2 \in \mathbb{R}^{3 \times 2} \quad \text{and} \quad O_4 = \text{softmax}\left(\frac{Q_4 K_2^T}{\sqrt{d_k}}\right) V_2 \in \mathbb{R}^{3 \times 2}$$
+            </div>
+
+            <h4>Final Output:</h4>
+            <div class="math-block">
+                $$O = [O_1, O_2, O_3, O_4] W_O \in \mathbb{R}^{3 \times 4} \quad \text{where } W_O \in \mathbb{R}^{8 \times 4}$$
+            </div>
+        </div>
+
+        <h3>Why GQA is Not Just MQA Repeated</h3>
+        <p>
+            A common point of confusion is thinking GQA and MQA cache the same data. They do not:
+        </p>
+        <ul>
+            <li><strong>MQA</strong> keeps <strong>1 database</strong> of Keys and Values in VRAM. Every query head searches the same book.</li>
+            <li><strong>GQA (e.g. 8 groups)</strong> keeps <strong>8 distinct databases</strong> in VRAM. Group 1 searches a "Syntax" book while Group 2 searches a "Semantics" book.</li>
+        </ul>
+    </section>
+
+    <!-- Section 4: MLA -->
+    <section id="mla">
+        <h2>4. Multi-Head Latent Attention (MLA): DeepSeek's Breakthrough</h2>
+        <p>
+            While GQA achieves significant savings, models like DeepSeek-V2 and DeepSeek-V3 introduce <strong>Multi-Head Latent Attention (MLA)</strong>. Instead of just reducing the number of heads, MLA uses <strong>low-rank matrix compression</strong> on the hidden representation directly.
+        </p>
+
+        <div class="card">
+            <h3>How MLA Works:</h3>
+            <ol>
+                <li>
+                    <strong>Low-Rank Down-Projection:</strong> The input vector <span class="math-inline">$h_t$</span> is compressed into a low-dimensional latent vector <span class="math-inline">$\mathbf{c}_t^{KV}$</span>:
+                    <div class="math-block">$$\mathbf{c}_t^{KV} = h_t W_{DKV} \in \mathbb{R}^{d_c} \quad (d_c \ll d_{\text{model}})$$</div>
+                </li>
+                <li>
+                    <strong>Latent Caching:</strong> During autoregressive generation, <em>only</em> this small latent vector <span class="math-inline">$\mathbf{c}_t^{KV}$</span> is stored in the KV cache, completely eliminating the need to store full <span class="math-inline">$K$</span> and <span class="math-inline">$V$</span> heads.
+                </li>
+                <li>
+                    <strong>Query-Side Matrix Absorption:</strong> Rather than reconstructing <span class="math-inline">$K$</span> and <span class="math-inline">$V$</span> via up-projection matrices during inference, the up-projection weight <span class="math-inline">$W_{UK}$</span> is mathematically absorbed into the Query projection:
+                    <div class="math-block">$$Q (c^{KV} W_{UK})^T = (Q W_{UK}^T) (c^{KV})^T$$</div>
+                    This allows computing attention scores directly against the compressed latent vector!
+                </li>
+                <li>
+                    <strong>Decoupled RoPE Key:</strong> Because Rotary Position Embeddings (RoPE) are non-linear and cannot be linearly absorbed, MLA introduces a small separate head for positional encoding:
+                    <div class="math-block">$$\text{Cached per token} = [\mathbf{c}_t^{KV} \in \mathbb{R}^{d_c}, \; \mathbf{k}_t^R \in \mathbb{R}^{d_R}]$$</div>
+                </li>
+            </ol>
+        </div>
+
+        <h3>Exact Memory Reduction Ratio Derivation</h3>
+        <p>Let's compare the per-token KV cache memory between MHA and MLA:</p>
+
+        <div class="math-block">
+            $$\text{MHA Cache per token} = 2 \times d_{\text{model}}$$
+            $$\text{MLA Latent Cache per token} = d_{\text{latent}}$$
+        </div>
+
+        <div class="callout callout-success">
+            <div class="callout-title">The Exact Savings Multiplier:</div>
+            <div class="math-block">
+                $$\text{Savings Factor} = \frac{\text{MHA Cache Size}}{\text{MLA Cache Size}} = \frac{2 \times d_{\text{model}}}{d_{\text{latent}}}$$
+            </div>
+            <p>
+                Notice the factor of <strong>2 in the numerator</strong>: MHA stores <em>two</em> full matrices (<span class="math-inline">$K$</span> and <span class="math-inline">$V$</span>), whereas MLA stores <em>one</em> compressed latent vector. For example, with <span class="math-inline">$d_{\text{model}} = 4096$</span> and <span class="math-inline">$d_{\text{latent}} = 512$</span>:
+            </p>
+            <div class="math-block">
+                $$\text{Savings Factor} = \frac{2 \times 4096}{512} = 16\times \text{ memory reduction!}$$
+            </div>
+        </div>
+    </section>
+
+    <!-- Comparison Table -->
+    <section id="comparison">
+        <h2>5. Architectural Comparison Matrix</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Architecture</th>
+                    <th>KV Heads (<span class="math-inline">$H_{KV}$</span>)</th>
+                    <th>Cache Entry / Token</th>
+                    <th>Memory vs MHA</th>
+                    <th>Model Capacity</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>MHA</strong></td>
+                    <td><span class="math-inline">$H_Q$</span></td>
+                    <td><span class="math-inline">$2 \times d_{\text{model}}$</span></td>
+                    <td><span class="highlight-amber">1.0&times; (Baseline)</span></td>
+                    <td><span class="highlight-green">Full</span></td>
+                </tr>
+                <tr>
+                    <td><strong>GQA</strong> (8 groups)</td>
+                    <td><span class="math-inline">$G$</span> (e.g. 8)</td>
+                    <td><span class="math-inline">$2 \times G \times d_k$</span></td>
+                    <td><span class="highlight-blue">~4&times; &ndash; 8&times; smaller</span></td>
+                    <td><span class="highlight-green">Near-MHA</span></td>
+                </tr>
+                <tr>
+                    <td><strong>MQA</strong></td>
+                    <td>1</td>
+                    <td><span class="math-inline">$2 \times d_k$</span></td>
+                    <td><span class="highlight-green">~32&times; &ndash; 64&times; smaller</span></td>
+                    <td><span class="highlight-amber">Slight Degradation</span></td>
+                </tr>
+                <tr>
+                    <td><strong>MLA</strong> (DeepSeek)</td>
+                    <td>Compressed Latent</td>
+                    <td><span class="math-inline">$d_c + d_R$</span></td>
+                    <td><span class="highlight-green">~8&times; &ndash; 16&times; smaller</span></td>
+                    <td><span class="highlight-green">Full MHA Quality</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- Key Takeaways -->
+    <section id="takeaways">
+        <h2>6. Summary & Takeaways</h2>
+        <ul>
+            <li><strong>MHA</strong> is expressive but suffers from severe memory bandwidth bottlenecks due to storing independent <span class="math-inline">$K, V$</span> heads for every Query head.</li>
+            <li><strong>MQA</strong> minimizes cache size by sharing a single <span class="math-inline">$(K, V)$</span> pair across all heads, achieving maximum throughput at the cost of slight capacity loss.</li>
+            <li><strong>GQA</strong> balances this trade-off by grouping query heads around several <span class="math-inline">$(K, V)$</span> pairs (standard in LLaMA-2/3, Mistral).</li>
+            <li><strong>MLA</strong> redefines cache efficiency by projecting representations into a low-rank latent space, absorbing weights via matrix algebra during decoding and achieving MHA-level representation with MQA-level cache footprints.</li>
+        </ul>
+    </section>
+
+    <footer>
+        <p>&copy; 2026 Mani &middot; Inference Engineering</p>
+    </footer>
+</div>
+
+<script>
+    window.addEventListener("load", function () {
+        if (window.renderMathInElement) {
+            renderMathInElement(document.body, {
+                delimiters: [
+                    { left: "$$", right: "$$", display: true },
+                    { left: "$", right: "$", display: false }
+                ],
+                throwOnError: false
+            });
+        }
+    });
+</script>
+
+</body>
+</html>

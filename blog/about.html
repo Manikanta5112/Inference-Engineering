@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manikanta Rajoli - Inference Engineering</title>
+<meta property="og:title" content="Manikanta Rajoli - Senior AI Developer">
+<meta property="og:description" content="Senior AI Developer at DS Digital Science, building multi-agent research systems, RAG pipelines, and inference infrastructure. Notes on LLM inference engineering.">
+<meta property="og:type" content="profile">
+<link rel="stylesheet" href="style-notebook.css">
+</head>
+<body>
+<div class="page">
+
+  <div class="nav-strip">
+    <a href="about.html"><strong>MR</strong></a>
+    <span class="sep">·</span>
+    <a href="index.html">Notebook</a>
+    <span class="sep">·</span>
+    <a href="about.html">About</a>
+  </div>
+
+  <div class="profile-header">
+    <div class="avatar">MR</div>
+    <div class="profile-name">
+      <h1 style="font-size:32px;">Manikanta Rajoli</h1>
+      <div class="profile-role">Senior AI Developer · DS Digital Science GmbH, Erlangen</div>
+    </div>
+  </div>
+
+  <p style="margin-top:22px;">I build multi-agent research systems, retrieval pipelines, and inference infrastructure for scientific and technical literature - mostly living in the layer between "a paper that says it works" and "a service that stays up." Outside of work I keep a running notebook on how LLM inference actually works under the hood: sampling, KV caches, attention variants, serving economics.</p>
+
+  <div class="tag-chips">
+    <span class="chip">LangGraph</span>
+    <span class="chip">Multi-Agent Systems</span>
+    <span class="chip">RAG</span>
+    <span class="chip">PyTorch</span>
+    <span class="chip">vLLM</span>
+    <span class="chip">AWS Bedrock &amp; SageMaker</span>
+    <span class="chip">Kubernetes</span>
+    <span class="chip">Fine-tuning</span>
+    <span class="chip">MCP</span>
+  </div>
+
+  <div class="profile-stats">
+    <div class="stat-item"><div class="num">3+ yrs</div><div class="label">applied AI / ML</div></div>
+    <div class="stat-item"><div class="num">AWS</div><div class="label">AI Practitioner &amp; SA Associate</div></div>
+    <div class="stat-item"><div class="num">OSS</div><div class="label">LangChain &amp; Pydantic AI contributor</div></div>
+  </div>
+
+  <div class="profile-links">
+    <a href="https://www.linkedin.com/in/manikanta-rajoli/">LinkedIn</a>
+    <a href="https://github.com/Manikanta5112">GitHub</a>
+    <a href="https://huggingface.co/">HuggingFace</a>
+  </div>
+
+  <h2>What I'm building at DS Digital Science</h2>
+
+  <p>Since July 2024 I've been working on transnational AI research tooling - a few things I'm most glad shipped:</p>
+
+  <ul>
+    <li><strong>Deep research pipeline (LangGraph):</strong> a multi-agent system for scientific and technical literature analysis, benchmarked against OpenAI Deep Research and Perplexity Deep Research - raised citation accuracy from a 45.4% baseline to 88–93% via a validate → rewrite → revalidate loop and evidence filtering.</li>
+    <li><strong>paper-type-classifier:</strong> a SageMaker pipeline classifying academic papers into a 45-node methodology taxonomy over a 1M-document lakehouse, with pluggable Bedrock / OpenAI-compatible / self-hosted vLLM backends - benchmarked at ~$0.00068 per document.</li>
+    <li><strong>Clinical RAG (pc-insight):</strong> a FastAPI + pgvector retrieval pipeline over EAU and ASCO prostate-cancer guidelines, reaching 87.4% correct-snippet retrieval and a 98.5% support ratio across 756 evaluation questions.</li>
+    <li><strong>Citation Expansion Tool:</strong> an AI-driven tool classifying citations across a contradicting → supporting spectrum to counter confirmation bias - owned end-to-end from concept to an internal, presenter-credited product.</li>
+    <li><strong>AI Gateway &amp; cost governance:</strong> led org-wide adoption of a centralized LLM gateway (LiteLLM/Bifrost) across 100+ APIs, with team-level budgets, RBAC, and a usage dashboard.</li>
+  </ul>
+
+  <h2>Experience</h2>
+
+  <div class="timeline">
+    <div class="timeline-item">
+      <p class="role">Senior AI Developer</p>
+      <p class="org-date">DS Digital Science GmbH, Stuttgart · Jul 2024 – Present</p>
+    </div>
+    <div class="timeline-item">
+      <p class="role">Intern Data Scientist</p>
+      <p class="org-date">BASF, Limburgerhof · Mar 2024 – Jun 2024</p>
+    </div>
+    <div class="timeline-item">
+      <p class="role">Master's Thesis Student - Generative AI</p>
+      <p class="org-date">BASF, Limburgerhof · Oct 2023 – Feb 2024</p>
+      <ul><li>TaxGPT: a Llama 2 model fine-tuned on German tax data, matching GPT-3.5 on the tax benchmark.</li></ul>
+    </div>
+    <div class="timeline-item">
+      <p class="role">Working Student - Data Scientist</p>
+      <p class="org-date">BASF, Limburgerhof · Feb 2023 – Sep 2023</p>
+    </div>
+    <div class="timeline-item">
+      <p class="role">Working Student - Data Analyst</p>
+      <p class="org-date">Siemens Healthineers, Forchheim · Mar 2022 – Jan 2023</p>
+    </div>
+    <div class="timeline-item">
+      <p class="role">Software Developer</p>
+      <p class="org-date">Ternary Tech Labs, Bangalore · Jun 2020 – Sep 2021</p>
+    </div>
+  </div>
+
+  <h2>Education</h2>
+  <p><strong>M.Sc. Data Science</strong> - FAU Erlangen-Nürnberg (Oct 2021 – Mar 2024)<br>
+  <strong>B.Eng. Computer Science &amp; Engineering</strong> - RGM College of Engineering &amp; Technology (Jun 2016 – Mar 2020)</p>
+
+  <div class="footer">© 2026 Mani · Inference Engineering</div>
+
+</div>
+</body>
+</html>

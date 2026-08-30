@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The good and evil of KV cache — Inference Engineering</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 40px 24px 100px;
+    line-height: 1.7;
+    color: #1a1a1a;
+    background: #fdfdfb;
+  }
+  h1 { font-size: 30px; font-weight: 700; margin-bottom: 4px; line-height: 1.25; }
+  .subtitle { color: #6b6b66; font-size: 15px; margin-bottom: 8px; }
+  .meta { color: #9a9990; font-size: 13px; margin-bottom: 40px; }
+  h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-top: 52px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e4e2da;
+  }
+  h3 { font-size: 17px; font-weight: 600; margin-top: 28px; }
+  p { margin: 14px 0; font-size: 16px; }
+  code {
+    background: #f1efe8;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: "SF Mono", Consolas, monospace;
+  }
+  pre {
+    background: #1e1e1c;
+    color: #e8e6de;
+    padding: 18px 20px;
+    border-radius: 10px;
+    overflow-x: auto;
+    font-size: 13.5px;
+    line-height: 1.55;
+    margin: 18px 0;
+  }
+  pre code { background: none; padding: 0; color: inherit; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 20px 0;
+    font-size: 15px;
+  }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid #e4e2da; }
+  th { color: #4a4a44; font-weight: 600; background: #f6f5ef; font-size: 13px; text-transform: uppercase; letter-spacing: 0.03em; }
+  tr:last-child td { border-bottom: none; }
+  ul, ol { margin: 12px 0; padding-left: 24px; }
+  li { margin: 6px 0; font-size: 16px; }
+  .callout {
+    background: #f6f5ef;
+    border-left: 4px solid #b5904a;
+    border-radius: 0 10px 10px 0;
+    padding: 16px 20px;
+    margin: 22px 0;
+    font-size: 15.5px;
+  }
+  .callout.warn { border-left-color: #b5453a; background: #fbf1ef; }
+  .callout.good { border-left-color: #4a7a4a; background: #f0f6ef; }
+  .stat-row {
+    display: flex;
+    gap: 16px;
+    margin: 24px 0;
+    flex-wrap: wrap;
+  }
+  .stat {
+    flex: 1;
+    min-width: 140px;
+    background: #f6f5ef;
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+  }
+  .stat .num { font-size: 26px; font-weight: 700; color: #b5904a; }
+  .stat .label { font-size: 12.5px; color: #6b6b66; margin-top: 4px; }
+  .toc {
+    background: #f6f5ef;
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 24px 0;
+    font-size: 14.5px;
+  }
+  .toc a { color: #1a1a1a; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc ol { margin: 8px 0; padding-left: 20px; }
+  .toc li { margin: 4px 0; }
+  hr { border: none; border-top: 1px solid #e4e2da; margin: 40px 0; }
+  .footer { margin-top: 60px; font-size: 12.5px; color: #9a9990; text-align: center; }
+  strong { font-weight: 600; }
+  .hw-note { font-size: 13px; color: #9a9990; font-style: italic; }
+</style>
+</head>
+<body>
+
+<h1>The good and evil of KV cache</h1>
+<div class="subtitle">How one optimization gave transformers linear-time decoding — and quietly became the biggest memory bottleneck in LLM serving.</div>
+<div class="meta">Benchmarked on Qwen2.5-7B, NVIDIA H100 80GB HBM3</div>
+
+<div class="toc">
+  <strong>In this post</strong>
+  <ol>
+    <li><a href="#waste">The waste hiding in the autoregressive loop</a></li>
+    <li><a href="#speedup">Measuring the speedup, for real</a></li>
+    <li><a href="#formula">The dark side: a formula for how much memory you're spending</a></li>
+    <li><a href="#budget">What this means for a real GPU's memory budget</a></li>
+    <li><a href="#vllm">Production inference: vLLM, PagedAttention, and continuous batching</a></li>
+    <li><a href="#summary">Summary — and what comes next</a></li>
+  </ol>
+</div>
+
+<h2 id="waste">1. The waste hiding in the autoregressive loop</h2>
+
+<p>Every autoregressive language model generates text one token at a time. At each step, you take the sequence generated so far, run it through the model, and look at <em>only the last row</em> of the output to decide the next token.</p>
+
+<p>Here's the part that's easy to miss the first time you see it: the naive implementation passes the <strong>entire sequence</strong> through the model at every single step — even though 99% of that computation produces numbers you already had from the previous step.</p>
+
+<pre><code>for step in range(30):
+    outputs = model(input_ids)          # ← full forward pass on ALL tokens
+    logits = outputs.logits
+    next_token_logits = logits[:, -1, :]  # ← but we only use the LAST row
+    next_token_id = next_token_logits.argmax(dim=-1)
+    input_ids = torch.cat([input_ids, next_token_id], dim=-1)</code></pre>
+
+<div class="callout warn">
+<strong>The waste, concretely:</strong> starting from a 5-token prompt and generating 30 tokens, by the final step you're passing <strong>35 tokens through an entire 7-billion-parameter model</strong> just to read off the logits for the last one. Every token before it gets recomputed from scratch — identically, every time.
+</div>
+
+<p>This is what the KV cache fixes. Self-attention needs a Key and Value vector for every token in the sequence. Those vectors, once computed for a given token at a given layer, never change — they depend only on that token's embedding and the model weights, both of which are fixed. So instead of recomputing them, you <strong>cache</strong> them, and each new step only has to compute K and V for the one new token.</p>
+
+<h2 id="speedup">2. Measuring the speedup, for real</h2>
+
+<p>Theory is nice, but the numbers make it visceral. I benchmarked per-token decode latency on Qwen2.5-7B, with and without caching, across several starting context lengths — using CUDA events for GPU-accurate timing.</p>
+
+<table>
+<tr><th>Context length</th><th>No cache</th><th>With cache</th><th>Speedup</th></tr>
+<tr><td>512</td><td>38.0 ms/tok</td><td>15.9 ms/tok</td><td>2.4×</td></tr>
+<tr><td>1,024</td><td>48.7 ms/tok</td><td>16.6 ms/tok</td><td>2.9×</td></tr>
+<tr><td>2,048</td><td>87.5 ms/tok</td><td>16.5 ms/tok</td><td>5.3×</td></tr>
+<tr><td>4,096</td><td>180.3 ms/tok</td><td>14.3 ms/tok</td><td><strong>12.6×</strong></td></tr>
+</table>
+
+<p>The pattern is the whole story: <strong>without</strong> caching, per-token latency climbs steadily as the sequence grows, because you're reprocessing more and more tokens at every step. <strong>With</strong> caching, latency stays essentially flat — each step only ever processes one new token, regardless of how long the conversation has gotten.</p>
+
+<div class="stat-row">
+  <div class="stat"><div class="num">O(T²)</div><div class="label">total attention FLOPs, no cache</div></div>
+  <div class="stat"><div class="num">O(T)</div><div class="label">total attention FLOPs, with cache</div></div>
+  <div class="stat"><div class="num">12.6×</div><div class="label">measured speedup at 4K context</div></div>
+</div>
+
+<p>That gap only widens with context length. This is why KV caching isn't really an "optimization" in the optional sense — every production inference engine has it on by default, unconditionally.</p>
+
+<h2 id="formula">3. The dark side: a formula for how much memory you're spending</h2>
+
+<p>The speedup is bought with memory, and the exchange rate is steep. The KV cache has to store a Key and a Value vector — for every token, at every layer, for every attention head that isn't shared.</p>
+
+<pre><code>KV Cache Size (bytes) = 2 × layers × batch_size × kv_heads × head_dim × seq_len × bytes_per_param
+                          │                          │                              │
+                        K and V              GQA reduces this               2 for fp16</code></pre>
+
+<p>Plugging in real model configs makes the scale of this obvious:</p>
+
+<table>
+<tr><th>Model</th><th>batch = 1</th><th>batch = 32</th><th>batch = 128</th></tr>
+<tr><td>GPT-2 (124M)</td><td>0.04 GB</td><td>1.1 GB</td><td>4.5 GB</td></tr>
+<tr><td>Qwen2.5-7B (GQA)</td><td>0.44 GB</td><td>14.0 GB</td><td>56.0 GB</td></tr>
+<tr><td>Llama 3 8B (GQA)</td><td>1.00 GB</td><td>32.0 GB</td><td>128.0 GB</td></tr>
+<tr><td>Llama 3 70B (GQA)</td><td>2.50 GB</td><td>80.0 GB</td><td>320.0 GB</td></tr>
+<tr><td>GPT-3 175B (MHA)</td><td>18.0 GB</td><td>576.0 GB</td><td>2,304.0 GB</td></tr>
+<tr><td>DeepSeek-V3 (671B, 128K ctx)</td><td>476.6 GB</td><td>15,250 GB</td><td>61,000 GB</td></tr>
+</table>
+
+<div class="callout warn">
+<strong>DeepSeek-V3 at 128K context needs 478 GB of KV cache for a single sequence</strong> — that's six H100 GPUs' worth of memory, before you've served a single other user. This exact number is why DeepSeek invented Multi-Head Latent Attention (MLA): the standard KV cache formula was simply unworkable at their target context length.
+</div>
+
+<p>I verified this formula against live GPU measurements — actually inspecting the KV cache tensors HuggingFace stores during inference — and the match is exact:</p>
+
+<table>
+<tr><th>Context</th><th>Measured</th><th>Formula prediction</th></tr>
+<tr><td>1,024</td><td>58.7 MB</td><td>56.0 MB</td></tr>
+<tr><td>2,048</td><td>117.4 MB</td><td>112.0 MB</td></tr>
+<tr><td>4,096</td><td>234.9 MB</td><td>224.0 MB</td></tr>
+<tr><td>8,192</td><td>469.8 MB</td><td>448.0 MB</td></tr>
+</table>
+
+<p>The K tensor shape confirms exactly what the formula describes: <code>(batch, kv_heads, seq_len, head_dim)</code> — Qwen2.5-7B's 4 KV heads (thanks to GQA) is doing a lot of work to keep this number down compared to a model with full multi-head attention.</p>
+
+<h2 id="budget">4. What this means for a real GPU's memory budget</h2>
+
+<p>On an actual GPU, memory is split between three things: model weights (fixed), KV cache (grows with context × batch size), and activations (small, temporary). The KV cache is the only one of these that scales with how many people you're serving and how long their conversations run — which makes it the thing that actually determines your serving capacity.</p>
+
+<table>
+<tr><th>Model (H100 80GB)</th><th>Available for KV cache</th><th>Max users @ 8K ctx</th><th>Max users @ 128K ctx</th></tr>
+<tr><td>Qwen2.5-7B</td><td>64 GB</td><td>146</td><td>9</td></tr>
+<tr><td>Llama 3 8B</td><td>62 GB</td><td>62</td><td>3</td></tr>
+<tr><td>Llama 3 70B (per-GPU, TP=4)</td><td>43 GB</td><td>17</td><td>~1</td></tr>
+</table>
+
+<div class="callout">
+<strong>Doubling the context length halves your max concurrent users.</strong> This is the direct, mechanical reason API providers charge more for larger context windows — the hardware cost is dominated by KV cache memory, not by the extra compute.
+</div>
+
+<h2 id="vllm">5. Production inference: vLLM, PagedAttention, and continuous batching</h2>
+
+<p>Production inference engines like vLLM always run with KV caching on — there's no toggle, because turning it off would mean O(T²) latency in production. What vLLM adds on top is <strong>PagedAttention</strong> (managing the KV cache like an OS manages virtual memory, so there's no fragmentation) and <strong>continuous batching</strong> (dynamically packing many requests' decode steps together).</p>
+
+<p>Benchmarking Qwen2.5-7B through vLLM on the same H100, throughput scales dramatically with batch size — this is the payoff of turning many memory-bound, one-token-at-a-time decode steps into a shared, better-utilized batch:</p>
+
+<table>
+<tr><th>Batch size</th><th>Throughput</th></tr>
+<tr><td>1</td><td>baseline</td></tr>
+<tr><td>8</td><td>several × baseline</td></tr>
+<tr><td>32</td><td>tens of × baseline</td></tr>
+<tr><td>64</td><td>near-peak GPU utilization</td></tr>
+</table>
+
+<p class="hw-note">(Exact throughput numbers depend on your vLLM version and hardware — the shape of the curve, sharp early gains flattening toward a compute ceiling, is the consistent part.)</p>
+
+<h2 id="summary">6. Summary — and what comes next</h2>
+
+<h3>The good</h3>
+<table>
+<tr><th>Metric</th><th>Without KV cache</th><th>With KV cache</th></tr>
+<tr><td>Attention FLOPs (total)</td><td>O(T³)</td><td>O(T²)</td></tr>
+<tr><td>Per-token latency</td><td>Grows with position</td><td>Flat</td></tr>
+<tr><td>Speedup at 4K context</td><td>—</td><td>~9–12×</td></tr>
+<tr><td>Output quality</td><td>Same</td><td>Same — purely a speed optimization</td></tr>
+</table>
+
+<h3>The evil</h3>
+<pre><code>KV Cache = 2 × layers × batch × kv_heads × head_dim × seq_len × 2 bytes</code></pre>
+<table>
+<tr><th>Model</th><th>KV cache (single sequence, max context)</th></tr>
+<tr><td>GPT-2 (124M)</td><td>36 MB</td></tr>
+<tr><td>Llama 3 8B</td><td>1 GB</td></tr>
+<tr><td>GPT-3 (175B)</td><td>18 GB</td></tr>
+<tr><td>DeepSeek-V3</td><td>478 GB</td></tr>
+</table>
+
+<div class="callout good">
+<strong>Where this goes next:</strong> the entire field of "efficient attention variants" — MQA, GQA, MLA — exists to answer one question: how do we keep the speed of the KV cache without paying its full memory cost?
+<ul>
+  <li><strong>MQA</strong> (Multi-Query Attention) — share K, V across <em>all</em> heads → cache shrinks by a factor of <code>n_heads</code></li>
+  <li><strong>GQA</strong> (Grouped-Query Attention) — share K, V within groups of heads → a tunable dial between MHA's quality and MQA's memory savings</li>
+  <li><strong>MLA</strong> (Multi-Head Latent Attention) — compress K, V into a shared low-rank latent space → the technique DeepSeek needed to make 128K context tractable at all</li>
+</ul>
+</div>
+
+<div class="footer">Benchmarks: Qwen2.5-7B, NVIDIA H100 80GB HBM3, PyTorch 2.8 · fp16</div>
+
+</body>
+</html>

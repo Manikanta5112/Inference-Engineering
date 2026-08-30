@@ -1,0 +1,354 @@
+/* ============================================================
+   Notebook theme - shared stylesheet for Inference Engineering
+   Drop this file in blogs/style-notebook.css and link it from
+   every post and the index page.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap');
+
+:root {
+  --paper: #fbfaf6;
+  --paper-line: #cddaf0;
+  --margin-red: #e2a0a0;
+  --ink: #1e3a5f;
+  --ink-soft: #3a5578;
+  --text: #33312b;
+  --text-muted: #7a7568;
+  --highlight: #ffe066;
+  --tape: #f3e6c4;
+  --shadow: rgba(60, 50, 30, 0.18);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Source Serif 4', Georgia, serif;
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1.75;
+
+  background:
+    linear-gradient(90deg, rgba(24, 23, 20, 0.035) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(24, 23, 20, 0.03) 1px, transparent 1px),
+    var(--paper);
+  background-size: 28px 28px;
+}
+
+.page {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 56px 40px 120px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- Headings: handwritten marker-pen feel ---------- */
+h1, h2, h3, .hand {
+  font-family: 'Kalam', cursive;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+h1 {
+  font-size: 38px;
+  line-height: 1.2;
+  margin: 0 0 6px;
+  position: relative;
+  display: inline-block;
+}
+
+/* hand-drawn underline squiggle under the title */
+h1::after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 10px;
+  margin-top: 2px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 10'%3E%3Cpath d='M0 6 Q 15 0 30 6 T 60 6 T 90 6 T 120 6 T 150 6 T 180 6 T 210 6 T 240 6 T 270 6 T 300 6' fill='none' stroke='%23e2a0a0' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") repeat-x;
+  background-size: 60px 10px;
+}
+
+h2 {
+  font-size: 25px;
+  margin-top: 52px;
+  padding-bottom: 6px;
+  border-bottom: 2px dashed var(--paper-line);
+}
+
+h3 {
+  font-size: 19px;
+  color: var(--ink-soft);
+  margin-top: 30px;
+}
+
+.subtitle {
+  font-family: 'Source Serif 4', serif;
+  font-style: italic;
+  color: var(--text-muted);
+  font-size: 16px;
+  margin: 4px 0 6px;
+}
+
+.meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 36px;
+}
+
+/* ---------- Body text ---------- */
+p { margin: 14px 0; }
+strong { color: var(--ink); font-weight: 600; }
+a { color: var(--ink-soft); text-decoration-color: var(--margin-red); text-decoration-thickness: 2px; }
+a:hover { text-decoration-color: var(--ink); }
+
+ul, ol { margin: 12px 0; padding-left: 26px; }
+li { margin: 6px 0; }
+
+/* ---------- Code: looks like a typed index card, taped down ---------- */
+code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--highlight);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 14px;
+}
+
+pre {
+  font-family: 'JetBrains Mono', monospace;
+  background: #fffdf6;
+  border: 1px solid #e4dcc4;
+  border-radius: 4px;
+  padding: 18px 20px;
+  overflow-x: auto;
+  font-size: 13.5px;
+  line-height: 1.6;
+  margin: 22px 0;
+  box-shadow: 3px 4px 0 var(--shadow);
+  position: relative;
+}
+pre::before {
+  content: "";
+  position: absolute;
+  top: -8px; left: 24px;
+  width: 46px; height: 16px;
+  background: var(--tape);
+  opacity: 0.85;
+  transform: rotate(-2deg);
+  box-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+}
+pre code { background: none; padding: 0; }
+
+/* ---------- Tables ---------- */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 22px 0;
+  font-size: 15px;
+  background: #fffdf6;
+  box-shadow: 2px 3px 0 var(--shadow);
+}
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--paper-line); }
+th {
+  font-family: 'Kalam', cursive;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--tape);
+}
+tr:last-child td { border-bottom: none; }
+
+/* ---------- Sticky-note callouts ---------- */
+.note {
+  background: var(--highlight);
+  border: 1px solid #e0c94a;
+  border-radius: 2px;
+  padding: 16px 20px;
+  margin: 24px 8px;
+  font-size: 15.5px;
+  box-shadow: 3px 4px 6px var(--shadow);
+  transform: rotate(-0.6deg);
+  position: relative;
+}
+.note.pink { background: #ffd6dd; border-color: #eaa6b3; transform: rotate(0.7deg); }
+.note.green { background: #dcf0d3; border-color: #a8cf94; transform: rotate(-0.4deg); }
+.note::before {
+  content: "📌";
+  position: absolute;
+  top: -12px; left: -8px;
+  font-size: 18px;
+}
+
+/* ---------- Stat chips ---------- */
+.stat-row { display: flex; gap: 14px; margin: 26px 0; flex-wrap: wrap; }
+.stat {
+  flex: 1; min-width: 130px;
+  background: #fffdf6;
+  border: 1px dashed var(--paper-line);
+  border-radius: 4px;
+  text-align: center;
+  padding: 14px;
+}
+.stat .num { font-family: 'Kalam', cursive; font-size: 26px; font-weight: 700; color: var(--ink); }
+.stat .label { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+hr { border: none; border-top: 2px dashed var(--paper-line); margin: 44px 0; }
+
+.footer {
+  margin-top: 64px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ---------- Index / listing page: index cards pinned to the page ---------- */
+.index-header { margin-bottom: 44px; }
+.index-header .count { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-muted); }
+
+.post-card {
+  display: block;
+  background: #fffdf6;
+  border: 1px solid #e4dcc4;
+  border-radius: 3px;
+  padding: 18px 22px;
+  margin: 0 4px 22px;
+  text-decoration: none;
+  color: var(--text);
+  box-shadow: 3px 4px 0 var(--shadow);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.post-card:nth-child(odd) { transform: rotate(-0.5deg); }
+.post-card:nth-child(even) { transform: rotate(0.6deg); }
+.post-card:hover {
+  transform: translateY(-3px) rotate(0deg);
+  box-shadow: 4px 7px 0 var(--shadow);
+}
+.post-card h3 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  color: var(--ink);
+}
+.post-card .desc { font-size: 14.5px; color: var(--text); margin: 0 0 10px; }
+.post-card .tags {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+.post-card .tag {
+  background: var(--tape);
+  padding: 2px 8px;
+  border-radius: 10px;
+  color: var(--ink-soft);
+}
+.post-card .tag.level { background: #dcf0d3; color: #3a6b2a; }
+
+@media (max-width: 600px) {
+  .page { padding: 40px 20px 100px; }
+  h1 { font-size: 30px; }
+}
+
+/* ---------- Profile / about page ---------- */
+.nav-strip {
+  display: flex; gap: 18px; align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  margin-bottom: 36px;
+}
+.nav-strip a { color: var(--ink-soft); text-decoration: none; }
+.nav-strip a:hover { text-decoration: underline; text-decoration-color: var(--margin-red); }
+.nav-strip .sep { color: var(--paper-line); }
+
+.profile-header { display: flex; gap: 24px; align-items: flex-start; margin-bottom: 8px; }
+.avatar {
+  flex: none;
+  width: 84px; height: 84px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: 'Kalam', cursive;
+  font-size: 30px;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 3px 4px 0 var(--shadow);
+  border: 3px solid #fffdf6;
+}
+.profile-name h1 { margin-bottom: 2px; }
+.profile-role {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+
+.tag-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }
+.chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  background: var(--tape);
+  color: var(--ink-soft);
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px solid #e4d8a8;
+}
+
+.profile-stats { display: flex; gap: 30px; margin: 22px 0 26px; flex-wrap: wrap; }
+.profile-stats .stat-item { text-align: left; }
+.profile-stats .stat-item .num { font-family: 'Kalam', cursive; font-size: 22px; font-weight: 700; color: var(--ink); }
+.profile-stats .stat-item .label { font-size: 11.5px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+
+.profile-links { display: flex; gap: 14px; margin: 10px 0 30px; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+.profile-links a {
+  color: var(--ink);
+  text-decoration: none;
+  border: 1px solid var(--paper-line);
+  padding: 5px 12px;
+  border-radius: 4px;
+  background: #fffdf6;
+}
+.profile-links a:hover { border-color: var(--ink-soft); }
+
+/* Learning / progress list */
+.learn-item {
+  display: flex; gap: 14px; align-items: flex-start;
+  background: #fffdf6;
+  border: 1px solid #e4dcc4;
+  border-radius: 3px;
+  padding: 14px 18px;
+  margin: 14px 0;
+  box-shadow: 2px 3px 0 var(--shadow);
+}
+.learn-item .badge {
+  flex: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  padding: 3px 9px;
+  border-radius: 10px;
+  margin-top: 3px;
+}
+.badge.done { background: #dcf0d3; color: #3a6b2a; }
+.badge.progress { background: #ffe9b3; color: #8a5a12; }
+.learn-item h4 { margin: 0 0 4px; font-family: 'Kalam', cursive; font-size: 17px; color: var(--ink); }
+.learn-item p { margin: 0; font-size: 14.5px; }
+.learn-item a { font-size: 13px; }
+
+/* Timeline for experience */
+.timeline { border-left: 2px dashed var(--paper-line); margin: 20px 0 20px 6px; padding-left: 22px; }
+.timeline-item { margin-bottom: 26px; position: relative; }
+.timeline-item::before {
+  content: "";
+  position: absolute;
+  left: -28px; top: 4px;
+  width: 10px; height: 10px;
+  background: var(--margin-red);
+  border-radius: 50%;
+  border: 2px solid var(--paper);
+}
+.timeline-item .role { font-family: 'Kalam', cursive; font-size: 18px; color: var(--ink); margin: 0; }
+.timeline-item .org-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted); margin: 2px 0 8px; }
+.timeline-item ul { margin: 6px 0; padding-left: 20px; }
+.timeline-item li { font-size: 14.5px; margin: 5px 0; }
